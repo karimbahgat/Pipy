@@ -39,7 +39,7 @@ def install(package):
 def login(username, password):
     """
     Creates the .pypirc file with login info (required in order to upload).
-    Once logged in, no need to do it again ever. 
+    The login (i.e. the file) persists until you call the logout function. 
     
     Note: Assumes same login info for both the testsite
     and the live site, so if different must login for each switch.
@@ -68,18 +68,45 @@ def login(username, password):
     print("logged in")
 
 def logout():
+    """
+    Deletes the .pypirc file with your login info.
+    Requires you to login again before uploading
+    another package. 
+    """
     # delete the .pypirc file for better security
     home = os.path.expanduser("~")
     path = os.path.join(home, ".pypirc")
     os.remove(path)
     print("logged out (.pypirc file removed)")
 
-def define_upload(package, name, version, license, **more_info):
+def define_upload(package, version, license, **more_info):
     """
-    Define and prep a package for upload
-    by creating the necessary files
+    Define and prep a package for upload by creating the necessary files
+    (in the parent folder containing the package's meta-data).
+    
+    - package: the path location of the package you wish to upload (i.e. the folder containing the actual code, not the meta-folder)
+    - version: the version of the upload (as a string)
+    - license: the name of the license for your package ('MIT' will automatically create an MIT license.txt file in your package)
+    
+    - **more_info: optional keyword arguments for defining the upload (see distutils.core.setup for valid arguments)
+    
     """
-    more_info.update(name=name, version=version, license=license)
+    more_info.update(version=version, license=license)
+    
+    # autofill "packages" in case user didnt specify it
+    folder , name = os.path.split(package)
+    if not more_info.get("packages"): more_info["packages"] = [name]
+    
+    # autofill "name" in case user didnt specify it
+    more_info["name"] = name
+
+    # autofill "long_description" from README in case user didnt specify it
+    for filename in os.listdir(folder):
+        if filename.startswith("README"):
+            readmepath = os.path.join(folder, filename)
+            more_info["long_description"] = open(readmepath, "r").read()
+            break
+    
     # make prep files
     _make_gitpack()
     _make_setup(package, **more_info)
@@ -91,8 +118,8 @@ def upload_test(package):
     """
     Upload and distribute your package
     to the online PyPi Testing website in a single
-    command with includes and docs, to test
-    if your real upload will work nicely or not.
+    command, to test if your real upload will
+    work nicely or not.
     """
     folder,name = os.path.split(package)
     # then try uploading
@@ -103,25 +130,21 @@ def upload_test(package):
     sys.argv = [setup_path, "register", "-r", "pypitest"]
     # then run setup.py to register package online
     print("registering package online (test)")
-    setupfile = open(setup_path, "r")
-    try: exec(setupfile)
-    except SystemExit as err: print err
+    try: _execute_setup(setup_path)
+    except SystemExit as err: print(err)
     # then upload the package
     print("uploading package (test)")
     sys.argv = [setup_path, "sdist", "upload", "-r", "pypitest"]
-    setupfile = open(setup_path, "r")
-    try: exec(setupfile)
-    except SystemExit as err: print err
+    try: _execute_setup(setup_path)
+    except SystemExit as err: print(err)
     print("package successfully uploaded (test)")
    
 def upload(package):
     """
     Upload and distribute your package
     to the online PyPi website in a single
-    command with includes and docs, so others
-    can find it more easily and install
-    it using pip.
-    (Not yet working)
+    command, so others can find it more
+    easily and install it using pip.
     """
     folder,name = os.path.split(package)
     # then try uploading
@@ -132,15 +155,13 @@ def upload(package):
     sys.argv = [setup_path, "register", "-r", "pypi"]
     # then run setup.py to register package online
     print("registering package online")
-    setupfile = open(setup_path, "r")
-    try: exec(setupfile)
-    except SystemExit as err: print err
+    try: _execute_setup(setup_path)
+    except SystemExit as err: print(err)
     # then upload the package
     print("uploading package")
     sys.argv = [setup_path, "sdist", "upload", "-r", "pypi"]
-    setupfile = open(setup_path, "r")
-    try: exec(setupfile)
-    except SystemExit as err: print err
+    try: _execute_setup(setup_path)
+    except SystemExit as err: print(err)
     print("package successfully uploaded")
 
 
@@ -150,6 +171,13 @@ def upload(package):
 
 
 # Internal use only
+
+def _execute_setup(setup_path):
+    setupfile = open(setup_path, "r")
+    if sys.version.startswith("3"):
+        exec(compile(setupfile.read(), 'setup.py', 'exec'))
+    else:
+        exec(setupfile)
 
 def _make_gitpack():
     pass
@@ -161,11 +189,11 @@ def _make_setup(package, **kwargs):
     setupstring += "setup("
 
     for param,value in kwargs.items():
-        if param in ["classifiers", "platforms"]:
+        if param in ["packages", "classifiers", "platforms"]:
             valuelist = value
             setupstring += "\t" + '%s=%s,'%(param,valuelist) + "\n"
         else:
-            setupstring += "\t" + '%s="%s",'%(param,value) + "\n"
+            setupstring += "\t" + '%s="""%s""",'%(param,value) + "\n"
     setupstring += "\t" + ")" + "\n"
         
 ##    setupstring += "\t" + 'name="%s",'%name + "\n"
