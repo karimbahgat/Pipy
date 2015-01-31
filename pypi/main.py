@@ -1,5 +1,4 @@
 
-import subprocess
 import sys, os
 
 
@@ -36,65 +35,86 @@ def install(package):
     """
     from pip import main
     main(["install", package])
+
+def login(username, password):
+    """
+    Creates the .pypirc file with login info (required in order to upload).
+    Once logged in, no need to do it again ever. 
     
-def define_upload(folder,
-            name,
-            version,
-            licence,
-            description,
-            author,
-            email,
-            homepage,
-            download,
-            keywords):
+    Note: Assumes same login info for both the testsite
+    and the live site, so if different must login for each switch.
+    """
+    pypircstring = ""
+    pypircstring += "[distutils]" + "\n"
+    pypircstring += "index-servers = " + "\n"
+    pypircstring += "\t" + "pypi" + "\n"
+    pypircstring += "\t" + "pypitest" + "\n"
+    pypircstring += "\n"
+    pypircstring += "[pypi]" + "\n"
+    pypircstring += "repository: https://pypi.python.org/pypi" + "\n"
+    pypircstring += "username: " + username + "\n"
+    pypircstring += "password: " + password + "\n"
+    pypircstring += "\n"
+    pypircstring += "[pypitest]" + "\n"
+    pypircstring += "repository: https://testpypi.python.org/pypi" + "\n"
+    pypircstring += "username: " + username + "\n"
+    pypircstring += "password: " + password + "\n"
+    # create the file
+    home = os.path.expanduser("~")
+    path = os.path.join(home, ".pypirc")
+    writer = open(path, "w")
+    writer.write(pypircstring)
+    writer.close()
+    print("logged in")
+
+def logout():
+    # delete the .pypirc file for better security
+    home = os.path.expanduser("~")
+    path = os.path.join(home, ".pypirc")
+    os.remove(path)
+    print("logged out (.pypirc file removed)")
+
+def define_upload(package, name, version, license, **more_info):
     """
     Define and prep a package for upload
     by creating the necessary files
     """
-    # first make prep files
+    more_info.update(name=name, version=version, license=license)
+    # make prep files
     _make_gitpack()
-    _make_setup(folder,
-                name,
-                version,
-                description,
-                author,
-                email,
-                homepage,
-                download,
-                keywords)
-    _make_cfg(folder)
-    _make_license(folder, licence)
+    _make_setup(package, **more_info)
+    _make_cfg(package)
+    _make_license(package, license)
+    print("package metadata prepped for upload")
 
-def dryrun_upload(folder):
+def upload_test(package):
     """
     Upload and distribute your package
     to the online PyPi Testing website in a single
     command with includes and docs, to test
     if your real upload will work nicely or not.
-    (Not yet working)
     """
+    folder,name = os.path.split(package)
     # then try uploading
     # instead of typing "python setup.py register -r pypitest" in commandline
+    os.chdir(folder)
     # set parameters as sysarg
     setup_path = os.path.join(folder, "setup.py")
     sys.argv = [setup_path, "register", "-r", "pypitest"]
-    # then run setup.py
-    rawcode = open(setup_path, "r").read()
-    exec(rawcode)
-    # then validate for no errors
+    # then run setup.py to register package online
+    print("registering package online (test)")
+    setupfile = open(setup_path, "r")
+    try: exec(setupfile)
+    except SystemExit as err: print err
+    # then upload the package
+    print("uploading package (test)")
     sys.argv = [setup_path, "sdist", "upload", "-r", "pypitest"]
-    exec(rawcode)
-    
-##    # make commandline accessible from IDLE
-##    python_path = os.path.split(sys.executable)[0]
-##    os.system('PATH="%s"'%python_path)
-##    # then run setup.py
-##    os.system('python %s'%setup_path)
-##    # then validate for no errors
-##    sys.argv = [setup_path, "sdist", "upload", "-r", "pypitest"]
-##    os.system('python %s'%setup_path)
-    
-def upload(folder):
+    setupfile = open(setup_path, "r")
+    try: exec(setupfile)
+    except SystemExit as err: print err
+    print("package successfully uploaded (test)")
+   
+def upload(package):
     """
     Upload and distribute your package
     to the online PyPi website in a single
@@ -103,17 +123,28 @@ def upload(folder):
     it using pip.
     (Not yet working)
     """
+    folder,name = os.path.split(package)
     # then try uploading
     # instead of typing "python setup.py register -r pypitest" in commandline
+    os.chdir(folder)
     # set parameters as sysarg
     setup_path = os.path.join(folder, "setup.py")
     sys.argv = [setup_path, "register", "-r", "pypi"]
-    # then run setup.py
-    rawcode = open(setup_path, "r").read()
-    exec(rawcode)
-    # then validate for no errors
+    # then run setup.py to register package online
+    print("registering package online")
+    setupfile = open(setup_path, "r")
+    try: exec(setupfile)
+    except SystemExit as err: print err
+    # then upload the package
+    print("uploading package")
     sys.argv = [setup_path, "sdist", "upload", "-r", "pypi"]
-    exec(rawcode)
+    setupfile = open(setup_path, "r")
+    try: exec(setupfile)
+    except SystemExit as err: print err
+    print("package successfully uploaded")
+
+
+
 
 
 
@@ -123,43 +154,49 @@ def upload(folder):
 def _make_gitpack():
     pass
 
-def _make_setup(folder,
-                name,
-                version,
-                description,
-                author,
-                email,
-                homepage,
-                download,
-                keywords):
+def _make_setup(package, **kwargs):
+    folder,name = os.path.split(package)
     setupstring = ""
     setupstring += "from distutils.core import setup" + "\n"
     setupstring += "setup("
-    setupstring += "\t" + 'name="%s",'%name + "\n"
-    setupstring += "\t" + 'packages=["%s"],'%name + "\n"
-    setupstring += "\t" + 'version="%s",'%version + "\n"
-    setupstring += "\t" + 'description="%s",'%description + "\n"
-    setupstring += "\t" + 'author="%s",'%author + "\n"
-    setupstring += "\t" + 'author_email="%s",'%email + "\n"
-    setupstring += "\t" + 'url="%s",'%homepage + "\n"
-    setupstring += "\t" + 'download_url="%s",'%download + "\n"
-    setupstring += "\t" + 'keywords=%s,'%keywords + "\n"
-    setupstring += "\t" + "classifiers=[]" + "\n"
+
+    for param,value in kwargs.items():
+        if param in ["classifiers", "platforms"]:
+            valuelist = value
+            setupstring += "\t" + '%s=%s,'%(param,valuelist) + "\n"
+        else:
+            setupstring += "\t" + '%s="%s",'%(param,value) + "\n"
     setupstring += "\t" + ")" + "\n"
+        
+##    setupstring += "\t" + 'name="%s",'%name + "\n"
+##    setupstring += "\t" + 'packages=["%s"],'%name + "\n"
+##    setupstring += "\t" + 'version="%s",'%version + "\n"
+##    setupstring += "\t" + 'description="%s",'%description + "\n"
+##    setupstring += "\t" + 'author="%s",'%author + "\n"
+##    setupstring += "\t" + 'author_email="%s",'%email + "\n"
+##    setupstring += "\t" + 'url="%s",'%homepage + "\n"
+##    setupstring += "\t" + 'download_url="%s",'%download + "\n"
+##    setupstring += "\t" + 'keywords=%s,'%keywords + "\n"
+##    setupstring += "\t" + "classifiers=[]" + "\n"
+##    setupstring += "\t" + ")" + "\n"
+    
     writer = open(os.path.join(folder, "setup.py"), "w")
     writer.write(setupstring)
     writer.close()
 
-def _make_cfg(folder):
-    setupstring = """
+def _make_cfg(package):
+    folder,name = os.path.split(package)
+    if "README.md" in os.listdir(folder):
+        setupstring = """
 [metadata]
 description-file = README.md
 """
-    writer = open(os.path.join(folder, "setup.cfg"), "w")
-    writer.write(setupstring)
-    writer.close()
+        writer = open(os.path.join(folder, "setup.cfg"), "w")
+        writer.write(setupstring)
+        writer.close()
 
-def _make_license(folder, type="MIT"):
+def _make_license(package, type="MIT"):
+    folder,name = os.path.split(package)
     if type == "MIT":
         licensestring = """
 The MIT License (MIT)
@@ -191,17 +228,4 @@ THE SOFTWARE.
 
 
 
-if __name__ == "__main__":
-    define_upload(folder="C:\Users\kimo\Desktop\code",
-                name="testcode",
-                version="0.1",
-                licence="MIT",
-                description="",
-                author="me",
-                email="karim.bahgat.norway@gmail.com",
-                homepage="",
-                download="",
-                keywords=["wakawaka"])
-
-    dryrun_upload("C:\Users\kimo\Desktop\code")
 
