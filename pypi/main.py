@@ -100,12 +100,13 @@ def define_upload(package, version, license, **more_info):
     # autofill "name" in case user didnt specify it
     more_info["name"] = name
 
-    # autofill "long_description" from README in case user didnt specify it
-    for filename in os.listdir(folder):
-        if filename.startswith("README"):
-            readmepath = os.path.join(folder, filename)
-            more_info["long_description"] = open(readmepath, "r").read()
-            break
+    # autofill "long_description" from README dynamically in case user didnt specify it
+    if not more_info.get("long_description"):
+        for filename in os.listdir(folder):
+            if filename.startswith("README"):
+                readmepath = os.path.join(folder, filename)
+                more_info["long_description"] = "open(r'%s', 'r').read()"%readmepath
+                break
     
     # make prep files
     _make_gitpack()
@@ -185,15 +186,19 @@ def _make_gitpack():
 def _make_setup(package, **kwargs):
     folder,name = os.path.split(package)
     setupstring = ""
-    setupstring += "from distutils.core import setup" + "\n"
+    setupstring += "from distutils.core import setup" + "\n\n"
     setupstring += "setup("
 
     for param,value in kwargs.items():
-        if param in ["packages", "classifiers", "platforms"]:
+        if param == "long_description" and value.startswith("open("):
+            dynamicfunc = value
+            setupstring += "\t" + '%s=%s,'%(param,dynamicfunc) + "\n"
+        elif param in ["packages", "classifiers", "platforms"]:
             valuelist = value
             setupstring += "\t" + '%s=%s,'%(param,valuelist) + "\n"
         else:
             setupstring += "\t" + '%s="""%s""",'%(param,value) + "\n"
+            
     setupstring += "\t" + ")" + "\n"
         
 ##    setupstring += "\t" + 'name="%s",'%name + "\n"
