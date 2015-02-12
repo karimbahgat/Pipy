@@ -1,5 +1,6 @@
 
 import sys, os
+import datetime
 
 
 pippath = __file__
@@ -27,14 +28,17 @@ sys.path.insert(0, pippath_folder)
 
 ###################################
 
-def install(package):
+def install(package, *options):
     """
-    Install a package from the IDLE,
-    same way as using the commandline
-    and typing "pip install ..."
+    Install a package from the IDLE, same way as using the commandline
+    and typing "pip install ..." Any number of additional string arguments
+    specify the install options that typically come after, such as "-u"
+    for update. See pip-documentation for valid option strings. 
     """
     from pip import main
-    main(["install", package])
+    args = ["install", package]
+    args.extend(options)
+    main(args)
 
 def login(username, password):
     """
@@ -79,12 +83,13 @@ def logout():
     os.remove(path)
     print("logged out (.pypirc file removed)")
 
-def define_upload(package, version, license, **more_info):
+def define_upload(package, description, version, license, **more_info):
     """
     Define and prep a package for upload by creating the necessary files
     (in the parent folder containing the package's meta-data).
     
     - package: the path location of the package you wish to upload (i.e. the folder containing the actual code, not the meta-folder)
+    - description: a short sentence describing the package
     - version: the version of the upload (as a string)
     - license: the name of the license for your package ('MIT' will automatically create an MIT license.txt file in your package)
     
@@ -98,7 +103,7 @@ def define_upload(package, version, license, **more_info):
     if not more_info.get("packages"): more_info["packages"] = [name]
     
     # autofill "name" in case user didnt specify it
-    more_info["name"] = name
+    if not more_info.get("name"): more_info["name"] = name
 
     # autofill "long_description" from README dynamically in case user didnt specify it
     if not more_info.get("long_description"):
@@ -112,7 +117,7 @@ def define_upload(package, version, license, **more_info):
     _make_gitpack()
     _make_setup(package, **more_info)
     _make_cfg(package)
-    _make_license(package, license)
+    _make_license(package, license, more_info.get("author") )
     print("package metadata prepped for upload")
 
 def upload_test(package):
@@ -181,6 +186,8 @@ def _execute_setup(setup_path):
         exec(setupfile)
 
 def _make_gitpack():
+    # maybe in the future but not really necessary, for prepping and
+    # allowing packages to be hosted directly from github
     pass
 
 def _make_setup(package, **kwargs):
@@ -189,6 +196,20 @@ def _make_setup(package, **kwargs):
     setupstring += "from distutils.core import setup" + "\n\n"
     setupstring += "setup("
 
+    # description/readme info
+    long_description = kwargs.pop("long_description", None)   
+    if long_description:
+        setupstring += "\t" + 'long_description="""%s""",'%long_description + "\n"
+    else:
+        # make the setup.py script dynamically autofill "long_description"
+        # ...from README in case user didnt specify it
+        for filename in os.listdir(folder):
+            if filename.startswith("README"):
+                readmepath = os.path.join(folder, filename)
+                setupstring += "\t" + 'long_description=open("%s").read(), '%readmepath + "\n"
+                break
+
+    # general options
     for param,value in kwargs.items():
         if param == "long_description" and value.startswith("open("):
             dynamicfunc = value
@@ -228,13 +249,14 @@ description-file = README.md
         writer.write(setupstring)
         writer.close()
 
-def _make_license(package, type="MIT"):
+def _make_license(package, type="MIT", author=None):
+    if not author: author = ""
     folder,name = os.path.split(package)
     if type == "MIT":
         licensestring = """
 The MIT License (MIT)
 
-Copyright (c) <year> <copyright holders>
+Copyright (c) %i %s
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -253,10 +275,12 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-"""
+""" % (datetime.datetime.today().year, author)
+        
         writer = open(os.path.join(folder, "license.txt"), "w")
         writer.write(licensestring)
         writer.close()
+
 
 
 
