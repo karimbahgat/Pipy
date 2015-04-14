@@ -12,10 +12,10 @@ try:
 except ImportError:
     print("Installing setuptools...")
     # install setuptools
-    setuptools_path = os.path.join(pippath_folder, "ez_setup.py")
-    python_path = os.path.split(sys.executable)[0]
-    os.system('PATH="%s"'%python_path)
-    os.system('python "%s"'%setuptools_path)
+    setuptools_path = '"%s"' %os.path.join(pippath_folder, "ez_setup.py")
+    python_folder = os.path.split(sys.executable)[0]
+    python_exe = os.path.join(python_folder, "python")
+    os.system(" ".join([python_exe, setuptools_path]) )
     # update systempath to look inside setuptools.egg, so don't have to restart python
     sitepackfolder = os.path.join(os.path.split(sys.executable)[0], "Lib", "site-packages")
     for filename in os.listdir(sitepackfolder):
@@ -30,15 +30,26 @@ sys.path.insert(0, pippath_folder)
 
 def install(package, *options):
     """
-    Install a package from the IDLE, same way as using the commandline
+    Install a package from within the IDLE, same way as using the commandline
     and typing "pip install ..." Any number of additional string arguments
-    specify the install options that typically come after, such as "-u"
+    specify the install options that typically come after, such as "-U"
     for update. See pip-documentation for valid option strings. 
     """
+    # (works on Windows, but needs to be tested on other OS)
+    import pip
     from pip import main
+    # call on pip
+    python_folder = os.path.split(sys.executable)[0]
+    python_exe = os.path.join(python_folder, "python") # use the executable named "python" instead of "pythonw"
+    pip_path = os.path.abspath(os.path.split(pip.__file__)[0]) # get entire pip folder path, not the __init__.py file
+    call_on_pip = [python_exe, '"%s"'%pip_path]
+    # pip args
     args = ["install", package]
     args.extend(options)
-    main(args)
+    # pause after
+    pause_after = ["&", "pause"]
+    # send to commandline
+    os.system(" ".join(call_on_pip + args + pause_after) ) #os.system('"%s" "%s" '%(python_exe,pip_path) + " ".join(args) + " & pause")
 
 def login(username, password):
     """
