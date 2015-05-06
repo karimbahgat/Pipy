@@ -28,6 +28,35 @@ sys.path.insert(0, pippath_folder)
 
 ###################################
 
+def _commandline_call(action, package, *options):
+    # (works on Windows, but needs to be tested on other OS)
+    import pip
+    from pip import main
+    # find the main python executable
+    python_folder = os.path.split(sys.executable)[0]
+    python_exe = os.path.join(python_folder, "python") # use the executable named "python" instead of "pythonw"
+    args = [python_exe]
+    # direct to local setup.py or call on pip
+    if package.endswith("setup.py"):
+        # "python setup.py install"
+        os.chdir(os.path.split(package)[0]) # changes working directory to setup.py folder
+        args.append("setup.py")
+        args.append("install")
+    else:
+        # equivalent to "pip install packageorfile"
+        if action == "build":
+            raise Exception("Build can only be done on a local 'setup.py' filepath, not on '%s'" % package)
+        pip_path = os.path.abspath(os.path.split(pip.__file__)[0]) # get entire pip folder path, not the __init__.py file
+        args.append('"%s"'%pip_path)
+        args.append(action)
+        args.append(package)
+    # options
+    args.extend(options)
+    # pause after
+    args.append("& pause")
+    # send to commandline
+    os.system(" ".join(args) ) #os.system('"%s" "%s" '%(python_exe,pip_path) + " ".join(args) + " & pause")
+
 def install(package, *options):
     """
     Install a package from within the IDLE, same way as using the commandline
@@ -35,22 +64,28 @@ def install(package, *options):
     specify the install options that typically come after, such as "-U"
     for update. See pip-documentation for valid option strings. 
     """
-    # (works on Windows, but needs to be tested on other OS)
-    import pip
-    from pip import main
-    # call on pip
-    python_folder = os.path.split(sys.executable)[0]
-    python_exe = os.path.join(python_folder, "python") # use the executable named "python" instead of "pythonw"
-    pip_path = os.path.abspath(os.path.split(pip.__file__)[0]) # get entire pip folder path, not the __init__.py file
-    call_on_pip = [python_exe, '"%s"'%pip_path]
-    # pip args
-    args = ["install", package]
-    args.extend(options)
-    # pause after
-    pause_after = ["&", "pause"]
-    # send to commandline
-    os.system(" ".join(call_on_pip + args + pause_after) ) #os.system('"%s" "%s" '%(python_exe,pip_path) + " ".join(args) + " & pause")
+    _commandline_call("install", package, *options)
 
+def build(package, *options):
+    """
+    Test if a local C/C++ package will build (aka compile)
+    successfully without actually installing it (ie placing it in
+    site-packages), from within the IDLE. Same way as using the commandline
+    and typing "pip build ..." Any number of additional string arguments
+    specify the build options that typically come after.
+    See pip-documentation for valid option strings. 
+    """
+    _commandline_call("build", package, *options)
+
+def uninstall(package, *options):
+    """
+    Uninstall a package from within the IDLE, same way as using the commandline
+    and typing "pip uninstall ..." Any number of additional string arguments
+    specify the uninstall options that typically come after.
+    See pip-documentation for valid option strings. 
+    """
+    _commandline_call("uninstall", package, *options)
+    
 def login(username, password):
     """
     Creates the .pypirc file with login info (required in order to upload).
