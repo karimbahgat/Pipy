@@ -142,7 +142,7 @@ def define_upload(package, description, version, license, **more_info):
     - **more_info: optional keyword arguments for defining the upload (see distutils.core.setup for valid arguments)
     
     """
-    more_info.update(version=version, license=license)
+    more_info.update(description=description, version=version, license=license)
     
     # autofill "packages" in case user didnt specify it
     folder , name = os.path.split(package)
@@ -150,14 +150,6 @@ def define_upload(package, description, version, license, **more_info):
     
     # autofill "name" in case user didnt specify it
     if not more_info.get("name"): more_info["name"] = name
-
-    # autofill "long_description" from README dynamically in case user didnt specify it
-    if not more_info.get("long_description"):
-        for filename in os.listdir(folder):
-            if filename.startswith("README"):
-                readmepath = os.path.join(folder, filename)
-                more_info["long_description"] = "open(r'%s', 'r').read()"%readmepath
-                break
     
     # make prep files
     _make_gitpack()
@@ -257,10 +249,7 @@ def _make_setup(package, **kwargs):
 
     # general options
     for param,value in kwargs.items():
-        if param == "long_description" and value.startswith("open("):
-            dynamicfunc = value
-            setupstring += "\t" + '%s=%s,'%(param,dynamicfunc) + "\n"
-        elif param in ["packages", "classifiers", "platforms"]:
+        if param in ["packages", "classifiers", "platforms"]:
             valuelist = value
             setupstring += "\t" + '%s=%s,'%(param,valuelist) + "\n"
         else:
