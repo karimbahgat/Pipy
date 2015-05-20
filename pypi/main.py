@@ -41,7 +41,7 @@ def _commandline_call(action, package, *options):
         # "python setup.py install"
         os.chdir(os.path.split(package)[0]) # changes working directory to setup.py folder
         args.append("setup.py")
-        args.append("install")
+        args.append(action)
     else:
         # equivalent to "pip install packageorfile"
         if action == "build":
