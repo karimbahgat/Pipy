@@ -157,6 +157,7 @@ def define_upload(package, description, version, license, **more_info):
     if not more_info.get("name"): more_info["name"] = name
     
     # make prep files
+    _make_readme(package)
     _make_gitpack()
     _make_setup(package, **more_info)
     _make_cfg(package)
@@ -171,6 +172,8 @@ def upload_test(package):
     work nicely or not.
     """
     folder,name = os.path.split(package)
+    # first remember to update the readme, in case docstring changed
+    _make_readme(package)
     # then try uploading
     # instead of typing "python setup.py register -r pypitest" in commandline
     os.chdir(folder)
@@ -196,6 +199,8 @@ def upload(package, autodoc=True):
     easily and install it using pip.
     """
     folder,name = os.path.split(package)
+    # first remember to update the readme, in case docstring changed
+    _make_readme(package)
     # then try uploading
     # instead of typing "python setup.py register -r pypi" in commandline
     os.chdir(folder)
@@ -214,11 +219,10 @@ def upload(package, autodoc=True):
     print("package successfully uploaded")
     # finally try generating and uploading documentation
     if autodoc:
-        pass
-        #_generate_docs(folder, name)
-        #print("documentation successfully generated")
-        #_upload_docs(package)
-        #print("documentation successfully uploaded to pythonhosted.org")
+        _make_docs(package)
+        print("documentation successfully generated")
+        _upload_docs(package)
+        print("documentation successfully uploaded to pythonhosted.org")
 
 
 
@@ -228,19 +232,65 @@ def upload(package, autodoc=True):
 
 # Internal use only
 
-def _generate_docs(package_folder, package_name, **kwargs):
-    # uses gitdown, which extracts all docstrings from package,
-    # ...builds a toplevel readme file, and creates a "build/doc" folder
-    # ...with the API documentation for each subpackage/submodule
-    # ...(converted to html using ipandoc)
-    import gitdoc
-    gitdoc.DocumentModule(package_folder, package_name, **kwargs)
+def _make_readme(package):
+    # assumes readme should be based on toplevel package docstring
+    import ipandoc # comes packaged in the pypi folder
+    folder,name = os.path.split(package)
+    name,ext = os.path.splitext(name)
+    # get toplevel package docstring
+    import imp
+    modinfo = imp.find_module(name,[folder])
+    mod = imp.load_module(name, *modinfo)
+    mdstring = mod.__doc__
+    # use ipandoc to convert assumed markdown string to rst for display on pypi
+    rststring = ipandoc.convert(mdstring, "markdown", "rst")
+    readmepath = os.path.join(folder, "README.rst")
+    with open(readmepath, "w") as readme:
+        readme.write(rststring)
+
+def _make_docs(package, **kwargs):
+    # uses pdoc to generate html folder
+    
+    # if pdoc not available, install it
+    try:
+        import pdoc
+    except ImportError:
+        install("pdoc")
+    
+    # find the main python executable
+    python_folder = os.path.split(sys.executable)[0]
+    python_exe = os.path.join(python_folder, "python") # use the executable named "python" instead of "pythonw"
+    args = [python_exe]
+    
+    # python pdoc_build.py --html packname --html-dir "path" --overwrite --external-links --html-no-source'
+    folder,name = os.path.split(package)
+    name,ext = os.path.splitext(name)
+    pdoc_path = os.path.join(os.path.split(__file__)[0], "pdoc_build.py") # comes packaged in the pypi folder
+    args.append(pdoc_path)
+    args.extend(["--html",name])
+    os.chdir(folder) # changes working directory to setup.py folder
+    docfolder = os.path.join(folder, "build", "doc")
+    if not os.path.lexists(docfolder):
+        os.makedirs(docfolder)
+    args.extend(["--html-dir", docfolder])
+
+    # options
+    args.append("--overwrite")
+    args.append("--external-links")
+    args.append("--html-no-source")
+    #args.extend(options)
+    
+    # pause after
+    args.append("& pause")
+    
+    # send to commandline
+    os.system(" ".join(args) )
 
 def _upload_docs(package):
     # instead of typing "python setup.py upload_docs" in commandline
     # by default uploads "build/doc" folder
     
-    # NOTE: MAYBE HAVE TO CHANGE SETUP.PY TO USE SETUPTOOLS INSTEAD OF DISTUTILS:
+    # NOTE: REQUIRES SETUP.PY TO USE SETUPTOOLS INSTEAD OF DISTUTILS
     # ...from setuptools import setup
     folder,name = os.path.split(package)
     os.chdir(folder)
@@ -262,7 +312,9 @@ def _make_gitpack():
 def _make_setup(package, **kwargs):
     folder,name = os.path.split(package)
     setupstring = ""
-    setupstring += "from distutils.core import setup" + "\n\n"
+    setupstring += "try: from setuptools import setup" + "\n"
+    setupstring += "except: from distutils.core import setup" + "\n"
+    setupstring += "\n"
     setupstring += "setup("
 
     # description/readme info
@@ -274,8 +326,7 @@ def _make_setup(package, **kwargs):
         # ...from README in case user didnt specify it
         for filename in os.listdir(folder):
             if filename.startswith("README"):
-                readmepath = os.path.join(folder, filename)
-                setupstring += "\t" + 'long_description=open("%s").read(), '%readmepath + "\n"
+                setupstring += "\t" + 'long_description=open("%s").read(), '%filename + "\n"
                 break
 
     # general options
