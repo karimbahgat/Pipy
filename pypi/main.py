@@ -36,7 +36,7 @@ def _commandline_call(action, package, *options):
     python_folder = os.path.split(sys.executable)[0]
     python_exe = os.path.join(python_folder, "python") # use the executable named "python" instead of "pythonw"
     args = [python_exe]
-    # direct to local setup.py or call on pip
+    # detect installation method (local setup.py VS online pip)
     if package.endswith("setup.py"):
         # "python setup.py install"
         os.chdir(os.path.split(package)[0]) # changes working directory to setup.py folder
@@ -46,6 +46,11 @@ def _commandline_call(action, package, *options):
         # equivalent to "pip install packageorfile"
         if action == "build":
             raise Exception("Build can only be done on a local 'setup.py' filepath, not on '%s'" % package)
+        # if github url, auto direct to github master zipfile
+        # ...(bleeding edge, not stable release)
+        if package.startswith("https://github.com") and not package.endswith((".zip",".gz")):
+            if not package.endswith("/"): package += "/"
+            package += "archive/master.zip"
         pip_path = os.path.abspath(os.path.split(pip.__file__)[0]) # get entire pip folder path, not the __init__.py file
         args.append('"%s"'%pip_path)
         args.append(action)
@@ -183,7 +188,7 @@ def upload_test(package):
     except SystemExit as err: print(err)
     print("package successfully uploaded (test)")
    
-def upload(package):
+def upload(package, autodoc=True):
     """
     Upload and distribute your package
     to the online PyPi website in a single
@@ -192,7 +197,7 @@ def upload(package):
     """
     folder,name = os.path.split(package)
     # then try uploading
-    # instead of typing "python setup.py register -r pypitest" in commandline
+    # instead of typing "python setup.py register -r pypi" in commandline
     os.chdir(folder)
     # set parameters as sysarg
     setup_path = os.path.join(folder, "setup.py")
@@ -207,6 +212,13 @@ def upload(package):
     try: _execute_setup(setup_path)
     except SystemExit as err: print(err)
     print("package successfully uploaded")
+    # finally try generating and uploading documentation
+    if autodoc:
+        pass
+        #_generate_docs(folder, name)
+        #print("documentation successfully generated")
+        #_upload_docs(package)
+        #print("documentation successfully uploaded to pythonhosted.org")
 
 
 
@@ -215,6 +227,25 @@ def upload(package):
 
 
 # Internal use only
+
+def _generate_docs(package_folder, package_name, **kwargs):
+    # uses gitdown, which extracts all docstrings from package,
+    # ...builds a toplevel readme file, and creates a "build/doc" folder
+    # ...with the API documentation for each subpackage/submodule
+    # ...(converted to html using ipandoc)
+    import gitdoc
+    gitdoc.DocumentModule(package_folder, package_name, **kwargs)
+
+def _upload_docs(package):
+    # instead of typing "python setup.py upload_docs" in commandline
+    # by default uploads "build/doc" folder
+    
+    # NOTE: MAYBE HAVE TO CHANGE SETUP.PY TO USE SETUPTOOLS INSTEAD OF DISTUTILS:
+    # ...from setuptools import setup
+    folder,name = os.path.split(package)
+    os.chdir(folder)
+    setup_path = os.path.join(folder, "setup.py")
+    _commandline_call("upload_docs", setup_path)
 
 def _execute_setup(setup_path):
     setupfile = open(setup_path, "r")
