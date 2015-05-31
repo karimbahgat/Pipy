@@ -18,7 +18,6 @@ import sys
 import tempfile
 
 import pdoc
-print(pdoc)
 
 version_suffix = '%d.%d' % (sys.version_info[0], sys.version_info[1])
 default_http_dir = path.join(tempfile.gettempdir(), 'pdoc-%s' % version_suffix)

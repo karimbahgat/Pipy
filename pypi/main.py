@@ -38,12 +38,12 @@ def _commandline_call(action, package, *options):
     args = [python_exe]
     # detect installation method (local setup.py VS online pip)
     if package.endswith("setup.py"):
-        # "python setup.py install"
+        # local "python setup.py install"
         os.chdir(os.path.split(package)[0]) # changes working directory to setup.py folder
         args.append("setup.py")
         args.append(action)
     else:
-        # equivalent to "pip install packageorfile"
+        # online "pip install packageorfile"
         if action == "build":
             raise Exception("Build can only be done on a local 'setup.py' filepath, not on '%s'" % package)
         # if github url, auto direct to github master zipfile
@@ -149,12 +149,18 @@ def define_upload(package, description, version, license, **more_info):
     """
     more_info.update(description=description, version=version, license=license)
     
-    # autofill "packages" in case user didnt specify it
+    # autofill "packages" or "py_modules" in case user didnt specify it
     folder , name = os.path.split(package)
-    if not more_info.get("packages"): more_info["packages"] = [name]
+    name, ext = os.path.splitext(name)
+    if os.path.isdir(package) and not more_info.get("packages"):
+        more_info["packages"] = [name]
+    elif os.path.isfile(package) and not more_info.get("py_modules"):
+        more_info["py_modules"] = [name]
     
     # autofill "name" in case user didnt specify it
-    if not more_info.get("name"): more_info["name"] = name
+    # ...this is taken from the repository folder name,
+    # ...not the package/import name.
+    if not more_info.get("name"): more_info["name"] = folder
     
     # make prep files
     _make_readme(package)
@@ -163,6 +169,18 @@ def define_upload(package, description, version, license, **more_info):
     _make_cfg(package)
     _make_license(package, license, more_info.get("author") )
     print("package metadata prepped for upload")
+
+def generate_docs(package, docfilter=["Module", "Class", "Function"],
+                  html_no_source=True, **kwargs):
+    """
+    Generates full API html docs of all submodules to "buil/doc" folder.
+    You do not have to use this function on your own since it
+    will be run automatically when uploading your package (assuming
+    that autodoc is set to True). However, this function can be used
+    for making sure the docs look good before uploading. 
+    """
+    _make_docs(package, docfilter=docfilter, html_no_source=html_no_source,
+               **kwargs)
 
 def upload_test(package):
     """
@@ -256,35 +274,94 @@ def _make_docs(package, **kwargs):
         import pdoc
     except ImportError:
         install("pdoc")
-    
-    # find the main python executable
-    python_folder = os.path.split(sys.executable)[0]
-    python_exe = os.path.join(python_folder, "python") # use the executable named "python" instead of "pythonw"
-    args = [python_exe]
-    
-    # python pdoc_build.py --html packname --html-dir "path" --overwrite --external-links --html-no-source'
+
+    # ALTERNATIVE: non commandline approach
+    # ...allowing for docfilter option
     folder,name = os.path.split(package)
     name,ext = os.path.splitext(name)
-    pdoc_path = os.path.join(os.path.split(__file__)[0], "pdoc_build.py") # comes packaged in the pypi folder
-    args.append(pdoc_path)
-    args.extend(["--html",name])
-    os.chdir(folder) # changes working directory to setup.py folder
-    docfolder = os.path.join(folder, "build", "doc")
-    if not os.path.lexists(docfolder):
-        os.makedirs(docfolder)
-    args.extend(["--html-dir", docfolder])
+    docfolder = kwargs.get("html_dir")
+    if not docfolder:
+        docfolder = os.path.join(folder, "build", "doc")
+    # get toplevel package docstring
+    import imp
+    modinfo = imp.find_module(name,[folder])
+    mod = imp.load_module(name, *modinfo)
+    # prep pdoc paramters
+    mod_kwargs = dict([item for item in kwargs.items() if item[0] in ("docfilter","allsubmodules")])
+    # docfilter, either list of type strings or function
+    if isinstance(mod_kwargs.get("docfilter"), (list,tuple)):
+        def docfilter(obj, filtertypes=mod_kwargs["docfilter"]):
+            return any(isinstance(obj, getattr(pdoc, filtertype))
+                       for filtertype in filtertypes)
+        mod_kwargs["docfilter"] = docfilter
+    # html params
+    mod = pdoc.Module(mod, **mod_kwargs)
+    html_kwargs = dict([item for item in kwargs.items() if item[0] in ("external_links","link_prefix","html_no_source")])
+    if html_kwargs.get("html_no_source"):
+        html_kwargs["source"] = not html_kwargs.pop("html_no_source")
+    # get and write to files
+    if mod.is_package():
+        def html_out_package(mod):
+            # create output folders
+            modtree = mod.name.split('.')
+            # remove top package name, to avoid yet another nested folder
+            modtree.pop(0) 
+            mbase = os.path.join(docfolder, *modtree)
+            if mod.is_package():
+                outpath = os.path.join(mbase, pdoc.html_package_name)
+            else:
+                outpath = '%s%s' % (mbase, pdoc.html_module_suffix)
+            dirpath = os.path.dirname(outpath)
+            if not os.path.lexists(dirpath):
+                os.makedirs(dirpath)
+            # write html
+            with open(outpath, 'w') as writer:
+                out = mod.html(**html_kwargs)
+                writer.write(out)
+            # do same for all submodules
+            for submodule in mod.submodules():
+                html_out_package(submodule)
+        html_out_package(mod)
+    else:
+        # create output folders
+        outpath = os.path.join(docfolder, "index.html")
+        dirpath = os.path.dirname(outpath)
+        if not os.path.lexists(dirpath):
+            os.makedirs(dirpath)
+        # write html
+        with open(outpath, 'w') as writer:
+            out = mod.html(**html_kwargs)
+            writer.write(out)
 
-    # options
-    args.append("--overwrite")
-    args.append("--external-links")
-    args.append("--html-no-source")
-    #args.extend(options)
-    
-    # pause after
-    args.append("& pause")
-    
-    # send to commandline
-    os.system(" ".join(args) )
+##    # commandline method
+##    # find the main python executable
+##    python_folder = os.path.split(sys.executable)[0]
+##    python_exe = os.path.join(python_folder, "python") # use the executable named "python" instead of "pythonw"
+##    args = [python_exe]
+##    
+##    # python pdoc_build.py --html packname --html-dir "path" --overwrite --external-links --html-no-source'
+##    folder,name = os.path.split(package)
+##    name,ext = os.path.splitext(name)
+##    pdoc_path = os.path.join(os.path.split(__file__)[0], "pdoc_build.py") # comes packaged in the pypi folder
+##    args.append(pdoc_path)
+##    args.extend(["--html",'"%s"'%package]) # prefer full module/package path
+##    os.chdir(folder) # changes working directory to setup.py folder
+##    docfolder = os.path.join(folder, "build", "doc")
+##    if not os.path.lexists(docfolder):
+##        os.makedirs(docfolder)
+##    args.extend(["--html-dir", docfolder])
+##
+##    # options
+##    args.append("--overwrite")
+##    args.append("--external-links")
+##    args.append("--html-no-source")
+##    #args.extend(options)
+##    
+##    # pause after
+##    args.append("& pause")
+##    
+##    # send to commandline
+##    os.system(" ".join(args) )
 
 def _upload_docs(package):
     # instead of typing "python setup.py upload_docs" in commandline
@@ -331,7 +408,7 @@ def _make_setup(package, **kwargs):
 
     # general options
     for param,value in kwargs.items():
-        if param in ["packages", "classifiers", "platforms"]:
+        if param in ["packages", "classifiers", "platforms", "py_modules"]:
             valuelist = value
             setupstring += "\t" + '%s=%s,'%(param,valuelist) + "\n"
         else:
@@ -357,10 +434,10 @@ def _make_setup(package, **kwargs):
 
 def _make_cfg(package):
     folder,name = os.path.split(package)
-    if "README.md" in os.listdir(folder):
+    if "README.rst" in os.listdir(folder):
         setupstring = """
 [metadata]
-description-file = README.md
+description-file = README.rst
 """
         writer = open(os.path.join(folder, "setup.cfg"), "w")
         writer.write(setupstring)
