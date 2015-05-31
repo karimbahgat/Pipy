@@ -134,20 +134,22 @@ def logout():
     os.remove(path)
     print("logged out (.pypirc file removed)")
 
-def define_upload(package, description, version, license, **more_info):
+def define_upload(package, description, license, **more_info):
     """
     Define and prep a package for upload by creating the necessary files
     (in the parent folder containing the package's meta-data).
     
-    - package: the path location of the package you wish to upload (i.e. the folder containing the actual code, not the meta-folder)
+    - package: the path location of the package you wish to upload (i.e. the folder containing the actual code, not the meta-folder) or the module file (with the .py extension)
     - description: a short sentence describing the package
-    - version: the version of the upload (as a string)
     - license: the name of the license for your package ('MIT' will automatically create an MIT license.txt file in your package)
     
     - **more_info: optional keyword arguments for defining the upload (see distutils.core.setup for valid arguments)
     
     """
-    more_info.update(description=description, version=version, license=license)
+    more_info.update(description=description, license=license)
+
+    # absolute path
+    package = os.path.abspath(package)
     
     # autofill "packages" or "py_modules" in case user didnt specify it
     folder , name = os.path.split(package)
@@ -161,6 +163,31 @@ def define_upload(package, description, version, license, **more_info):
     # ...this is taken from the repository folder name,
     # ...not the package/import name.
     if not more_info.get("name"): more_info["name"] = folder
+
+    # autofill "version" in case user didnt specify it
+    if not more_info.get("version"):
+        # determine file to read
+        if os.path.isdir(package):
+            topfile = os.path.join(package, "__init__.py")
+        else:
+            topfile = package
+        # find line that starts with __version__
+        # ...NOTE: inspired by Sean Gillies' Fiona setup.py
+        with open(topfile) as fileobj:
+            for line in fileobj:
+                if line.startswith("__version__"):
+                    version = line.split("=")[1].strip()
+                    version = version.strip('"')
+                    version = version.strip("'")
+                    more_info["version"] = version
+                    break
+        # raise error if none found
+        if not more_info.get("version"):
+            raise Exception("""Version argument can only be omitted if your
+                            package's __init__.py file or module file contains
+                            a __version__ variable.""")
+                
+            
     
     # make prep files
     _make_readme(package)
@@ -179,6 +206,9 @@ def generate_docs(package, docfilter=["Module", "Class", "Function"],
     that autodoc is set to True). However, this function can be used
     for making sure the docs look good before uploading. 
     """
+    # absolute path
+    package = os.path.abspath(package)
+    ###
     _make_docs(package, docfilter=docfilter, html_no_source=html_no_source,
                **kwargs)
 
@@ -189,6 +219,9 @@ def upload_test(package):
     command, to test if your real upload will
     work nicely or not.
     """
+    # absolute path
+    package = os.path.abspath(package)
+    ###
     folder,name = os.path.split(package)
     # first remember to update the readme, in case docstring changed
     _make_readme(package)
@@ -216,6 +249,9 @@ def upload(package, autodoc=True):
     command, so others can find it more
     easily and install it using pip.
     """
+    # absolute path
+    package = os.path.abspath(package)
+    ###
     folder,name = os.path.split(package)
     # first remember to update the readme, in case docstring changed
     _make_readme(package)
