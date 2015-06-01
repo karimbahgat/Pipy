@@ -297,10 +297,11 @@ def _make_readme(package):
     mod = imp.load_module(name, *modinfo)
     mdstring = mod.__doc__
     # use ipandoc to convert assumed markdown string to rst for display on pypi
-    rststring = ipandoc.convert(mdstring, "markdown", "rst")
-    readmepath = os.path.join(folder, "README.rst")
-    with open(readmepath, "w") as readme:
-        readme.write(rststring)
+    if mdstring:
+        rststring = ipandoc.convert(mdstring, "markdown", "rst")
+        readmepath = os.path.join(folder, "README.rst")
+        with open(readmepath, "w") as readme:
+            readme.write(rststring)
 
 def _make_docs(package, **kwargs):
     # uses pdoc to generate html folder
@@ -313,6 +314,7 @@ def _make_docs(package, **kwargs):
 
     # ALTERNATIVE: non commandline approach
     # ...allowing for docfilter option
+    # ...TODO: Clean up this section, messy
     folder,name = os.path.split(package)
     name,ext = os.path.splitext(name)
     docfolder = kwargs.get("html_dir")
@@ -330,6 +332,10 @@ def _make_docs(package, **kwargs):
             return any(isinstance(obj, getattr(pdoc, filtertype))
                        for filtertype in filtertypes)
         mod_kwargs["docfilter"] = docfilter
+    # remove module prose docstring, only show API classes, funcs, and meths
+    mod.__doc__ = """
+                  # **API Documentation**
+                  """
     # html params
     mod = pdoc.Module(mod, **mod_kwargs)
     html_kwargs = dict([item for item in kwargs.items() if item[0] in ("external_links","link_prefix","html_no_source")])
