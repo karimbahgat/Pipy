@@ -305,6 +305,7 @@ def _make_readme(package):
 
 def _make_docs(package, **kwargs):
     # uses pdoc to generate html folder
+    # ...TODO: Clean up this section, very messy
     
     # if pdoc not available, install it
     try:
@@ -312,9 +313,8 @@ def _make_docs(package, **kwargs):
     except ImportError:
         install("pdoc")
 
-    # ALTERNATIVE: non commandline approach
+    # non commandline approach
     # ...allowing for docfilter option
-    # ...TODO: Clean up this section, messy
     folder,name = os.path.split(package)
     name,ext = os.path.splitext(name)
     docfolder = kwargs.get("html_dir")
@@ -375,7 +375,7 @@ def _make_docs(package, **kwargs):
             out = mod.html(**html_kwargs)
             writer.write(out)
 
-##    # commandline method
+##    # commandline approach
 ##    # find the main python executable
 ##    python_folder = os.path.split(sys.executable)[0]
 ##    python_exe = os.path.join(python_folder, "python") # use the executable named "python" instead of "pythonw"
@@ -414,7 +414,8 @@ def _upload_docs(package):
     folder,name = os.path.split(package)
     os.chdir(folder)
     setup_path = os.path.join(folder, "setup.py")
-    _commandline_call("upload_docs", setup_path)
+    options=["--upload-dir=build/doc"]
+    _commandline_call("upload_docs", setup_path, *options)
 
 def _execute_setup(setup_path):
     setupfile = open(setup_path, "r")
@@ -513,7 +514,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """ % (datetime.datetime.today().year, author)
         
-        writer = open(os.path.join(folder, "license.txt"), "w")
+        writer = open(os.path.join(folder, "LICENSE.txt"), "w")
         writer.write(licensestring)
         writer.close()
 
