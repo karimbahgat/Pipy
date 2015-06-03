@@ -99,18 +99,20 @@ def login(username, password):
     Note: Assumes same login info for both the testsite
     and the live site, so if different must login for each switch.
     """
+    # if still not recognize login bug
+    # change to http://stackoverflow.com/questions/1569315/setup-py-upload-is-failing-with-upload-failed-401-you-must-be-identified-t/1569331#1569331
     pypircstring = ""
     pypircstring += "[distutils]" + "\n"
     pypircstring += "index-servers = " + "\n"
     pypircstring += "\t" + "pypi" + "\n"
-    pypircstring += "\t" + "pypitest" + "\n"
+    pypircstring += "\t" + "testpypi" + "\n"
     pypircstring += "\n"
     pypircstring += "[pypi]" + "\n"
     pypircstring += "repository: https://pypi.python.org/pypi" + "\n"
     pypircstring += "username: " + username + "\n"
     pypircstring += "password: " + password + "\n"
     pypircstring += "\n"
-    pypircstring += "[pypitest]" + "\n"
+    pypircstring += "[testpypi]" + "\n"
     pypircstring += "repository: https://testpypi.python.org/pypi" + "\n"
     pypircstring += "username: " + username + "\n"
     pypircstring += "password: " + password + "\n"
@@ -225,22 +227,18 @@ def upload_test(package):
     folder,name = os.path.split(package)
     # first remember to update the readme, in case docstring changed
     _make_readme(package)
-    # then try uploading
-    # instead of typing "python setup.py register -r pypitest" in commandline
-    os.chdir(folder)
-    # set parameters as sysarg
+    # then try registering
+    # instead of typing "python setup.py register -r testpypi" in commandline
+    print("registering package (test)")
     setup_path = os.path.join(folder, "setup.py")
-    sys.argv = [setup_path, "register", "-r", "pypitest"]
-    # then run setup.py to register package online
-    print("registering package online (test)")
-    try: _execute_setup(setup_path)
-    except SystemExit as err: print(err)
-    # then upload the package
+    options = ["-r", "testpypi"]
+    _commandline_call("register", setup_path, *options)
+    # then try uploading
+    # instead of typing "python setup.py sdist upload -r testpypi" in commandline
     print("uploading package (test)")
-    sys.argv = [setup_path, "sdist", "upload", "-r", "pypitest"]
-    try: _execute_setup(setup_path)
-    except SystemExit as err: print(err)
-    print("package successfully uploaded (test)")
+    setup_path = os.path.join(folder, "setup.py")
+    options = ["upload", "-r", "testpypi"]
+    _commandline_call("sdist", setup_path, *options)
    
 def upload(package, autodoc=True):
     """
@@ -255,22 +253,30 @@ def upload(package, autodoc=True):
     folder,name = os.path.split(package)
     # first remember to update the readme, in case docstring changed
     _make_readme(package)
-    # then try uploading
+    # then try registering
     # instead of typing "python setup.py register -r pypi" in commandline
-    os.chdir(folder)
-    # set parameters as sysarg
+    print("registering package")
     setup_path = os.path.join(folder, "setup.py")
-    sys.argv = [setup_path, "register", "-r", "pypi"]
-    # then run setup.py to register package online
-    print("registering package online")
-    try: _execute_setup(setup_path)
-    except SystemExit as err: print(err)
-    # then upload the package
+    options = ["-r", "pypi"]
+    _commandline_call("register", setup_path, *options)
+    # then try uploading
+    # instead of typing "python setup.py sdist upload -r pypi" in commandline
     print("uploading package")
-    sys.argv = [setup_path, "sdist", "upload", "-r", "pypi"]
-    try: _execute_setup(setup_path)
-    except SystemExit as err: print(err)
-    print("package successfully uploaded")
+    setup_path = os.path.join(folder, "setup.py")
+    options = ["upload", "-r", "pypi"]
+    _commandline_call("sdist", setup_path, *options)
+    
+##    # set parameters
+##    sys.argv = [setup_path, "register", "-r", "pypi"]
+##    # then run setup.py to register package online
+##    print("registering package online")
+##    _execute_setup(setup_path)
+##    # then upload the package
+##    print("uploading package")
+##    sys.argv = [setup_path, "sdist", "upload", "-r", "pypi"]
+##    _execute_setup(setup_path)
+##    print("package successfully uploaded")
+    
     # finally try generating and uploading documentation
     if autodoc:
         _make_docs(package)
@@ -417,8 +423,22 @@ def _upload_docs(package):
     options=["--upload-dir=build/doc"]
     _commandline_call("upload_docs", setup_path, *options)
 
+# doesnt work after all, since upload command does not allow username and password as args
+##def _try_upload(setup_path, username, password):
+##    if username and password:
+##        sys.argv.extend([])
+##        _execute_setup()
+##    else:
+##        # hope that pypirc file is set and works
+##        _execute_setup()
+##        # if not, ask for interactive login info and try again
+##        username = input("Username")
+##        password = input("Password")
+##        _execute_setup()
+##        pass
+
 def _execute_setup(setup_path):
-    setupfile = open(setup_path, "r")
+    setupfile = open(setup_path)
     if sys.version.startswith("3"):
         exec(compile(setupfile.read(), 'setup.py', 'exec'))
     else:
