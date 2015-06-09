@@ -39,6 +39,7 @@ def _commandline_call(action, package, *options):
     # detect installation method (local setup.py VS online pip)
     if package.endswith("setup.py"):
         # local "python setup.py install"
+        package = os.path.abspath(package) # absolute path
         os.chdir(os.path.split(package)[0]) # changes working directory to setup.py folder
         args.append("setup.py")
         args.append(action)
@@ -153,21 +154,44 @@ def define_upload(package, description, license, **more_info):
     # absolute path
     package = os.path.abspath(package)
     
-    # autofill "packages" or "py_modules" in case user didnt specify it
+    # disect path
     folder , name = os.path.split(package)
     name, ext = os.path.splitext(name)
-    if os.path.isdir(package) and not more_info.get("packages"):
-        more_info["packages"] = [name]
-    elif os.path.isfile(package) and not more_info.get("py_modules"):
+
+    # autofill "packages" in case user didnt specify it
+    # ...toplevel and all subpackages
+    if os.path.isdir(package) and not "packages" in more_info:
+        subpacks = []
+        for dirr,_,files in os.walk(package):
+            reldirr = os.path.relpath(dirr, folder)
+            if "__init__.py" in files:
+                subpacks.append(reldirr)
+        more_info["packages"] = subpacks
+
+    # autofill "py_modules" in case user didnt specify it
+    elif os.path.isfile(package) and not "py_modules" in more_info:
         more_info["py_modules"] = [name]
-    
+
+    # autofill "package_data" arg in case user didnt specify
+    if os.path.isdir(package) and not "package_data" in more_info:
+        data = []
+        for dirr,_,files in os.walk(package):
+            reldirr = os.path.relpath(dirr, package)
+            # look for data
+            data += [os.path.join(reldirr,filename)
+                     for filename in files
+                     if not filename.endswith((".py",".pyc"))]
+        if data:
+            package_data = dict([(name, data)])
+            more_info["package_data"] = package_data
+
     # autofill "name" in case user didnt specify it
     # ...this is taken from the repository folder name,
     # ...not the package/import name.
-    if not more_info.get("name"): more_info["name"] = folder
+    if not "name" in more_info: more_info["name"] = folder
 
     # autofill "version" in case user didnt specify it
-    if not more_info.get("version"):
+    if not "version" in more_info:
         # determine file to read
         if os.path.isdir(package):
             topfile = os.path.join(package, "__init__.py")
@@ -184,12 +208,10 @@ def define_upload(package, description, license, **more_info):
                     more_info["version"] = version
                     break
         # raise error if none found
-        if not more_info.get("version"):
+        if not "version" in more_info:
             raise Exception("""Version argument can only be omitted if your
                             package's __init__.py file or module file contains
                             a __version__ variable.""")
-                
-            
     
     # make prep files
     _make_readme(package)
@@ -199,10 +221,9 @@ def define_upload(package, description, license, **more_info):
     _make_license(package, license, more_info.get("author") )
     print("package metadata prepped for upload")
 
-def generate_docs(package, docfilter=["Module", "Class", "Function"],
-                  html_no_source=True, **kwargs):
+def generate_docs(package, **kwargs):
     """
-    Generates full API html docs of all submodules to "buil/doc" folder.
+    Generates full API html docs of all submodules to "build/doc" folder.
     You do not have to use this function on your own since it
     will be run automatically when uploading your package (assuming
     that autodoc is set to True). However, this function can be used
@@ -211,8 +232,18 @@ def generate_docs(package, docfilter=["Module", "Class", "Function"],
     # absolute path
     package = os.path.abspath(package)
     ###
-    _make_docs(package, docfilter=docfilter, html_no_source=html_no_source,
-               **kwargs)
+    _make_docs(package, **kwargs)
+    print("documentation successfully generated")
+
+def upload_docs(package, **kwargs):
+    """
+    Upload documentation html docs located in "build/doc" folder.
+    """
+    # absolute path
+    package = os.path.abspath(package)
+    ###
+    _upload_docs(package, **kwargs)
+    print("documentation successfully uploaded to pythonhosted.org")
 
 def upload_test(package):
     """
@@ -279,10 +310,8 @@ def upload(package, autodoc=True):
     
     # finally try generating and uploading documentation
     if autodoc:
-        _make_docs(package)
-        print("documentation successfully generated")
-        _upload_docs(package)
-        print("documentation successfully uploaded to pythonhosted.org")
+        generate_docs(package)
+        upload_docs(package)
 
 
 
@@ -312,6 +341,12 @@ def _make_readme(package):
 def _make_docs(package, **kwargs):
     # uses pdoc to generate html folder
     # ...TODO: Clean up this section, very messy
+
+    # set some defaults
+    if not kwargs.get("docfilter"):
+        kwargs["docfilter"] = ["Module", "Class", "Function"]
+    if kwargs.get("html_no_source") == None:
+        kwargs["html_no_source"] = True
     
     # if pdoc not available, install it
     try:
@@ -411,7 +446,7 @@ def _make_docs(package, **kwargs):
 ##    # send to commandline
 ##    os.system(" ".join(args) )
 
-def _upload_docs(package):
+def _upload_docs(package, **kwargs):
     # instead of typing "python setup.py upload_docs" in commandline
     # by default uploads "build/doc" folder
     
@@ -420,7 +455,8 @@ def _upload_docs(package):
     folder,name = os.path.split(package)
     os.chdir(folder)
     setup_path = os.path.join(folder, "setup.py")
-    options=["--upload-dir=build/doc"]
+    upload_dir = kwargs.get("upload_dir", "build/doc")
+    options = ["--upload-dir=%s" % upload_dir]
     _commandline_call("upload_docs", setup_path, *options)
 
 # doesnt work after all, since upload command does not allow username and password as args
@@ -471,7 +507,9 @@ def _make_setup(package, **kwargs):
 
     # general options
     for param,value in kwargs.items():
-        if param in ["packages", "classifiers", "platforms", "py_modules"]:
+        if param in ["packages", "classifiers", "platforms",
+                     "py_modules", "requires", "data_files",
+                     "package_data"]:
             valuelist = value
             setupstring += "\t" + '%s=%s,'%(param,valuelist) + "\n"
         else:

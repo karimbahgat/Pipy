@@ -77,6 +77,21 @@ Primarily for my own use, this is the only way I handle packages and it
 was the turning stone that made it fun to install new packages and
 finally allowed me to share my work on the PyPi website. 
 
+## Other auto tools
+Admittedly, there are other auto tools out there already. However, these tend to focus only
+on one or parts of the steps mentioned here, and as usual are almost exclusively
+commandline centered. For instance:
+
+- https://github.com/michaeljoseph/changes
+- http://seed.readthedocs.org/en/latest/
+- Also zest.releaser...
+- Maybe more at https://opensourcehacker.com/2012/08/14/high-quality-automated-package-releases-for-python-with-zest-releaser/
+
+These may have advantages of their own, but with pypi you can have all of the steps gathered
+in one package, and can run them from within the Python IDLE shell or automate it in a Python script,
+which is particularly useful for beginners or those who prefer to stay away from
+the commandline. 
+
 Karim Bahgat, 2015
 
 ## Disclaimer
@@ -202,6 +217,20 @@ real site.
 **Tips:** If the upload process complains about needing your account details even
 though you have logged in, make sure that you have indeed registered on the site that
 you are trying to upload to (the test site and the real site have different accounts). 
-    
+
+
+## To do
+
+- Ask mailing list about pypi package name conflict/ethics. 
+- Automate uploading as wheel, http://pythonwheels.com/
+- Prevent running all upload steps after one of the steps fail, maybe by switching to subprocess and listen for result. 
+- Add support for changelog:
+    a. Either auto detect a changelog file, and append to README.rst.
+    b. And/or add a `changes` str or list of str arg to pypi.upload(). The new version nr will be written as a new heading to a changelog file, along with bulletpoints of the given text of changes for that version upload.
+    c. Or maybe...read changes from git somehow, but would be limited to people using GitHub. See eg https://github.com/michaeljoseph/changes
+- Make all hidden methods into public, so that user can more easily customize.
+- Possibly also upload each new pypi release as a new version to GitHub, would be really nice?
+- Add autoincr arg defaulting to True for detecting and incrementing the __version__ var in your top script. 
+
 """
 from .main import *
