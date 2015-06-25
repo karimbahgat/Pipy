@@ -61,7 +61,7 @@ def _commandline_call(action, package, *options):
     # pause after
     args.append("& pause")
     # send to commandline
-    os.system(" ".join(args) ) #os.system('"%s" "%s" '%(python_exe,pip_path) + " ".join(args) + " & pause")
+    os.system(" ".join(args) ) 
 
 def install(package, *options):
     """
@@ -137,7 +137,7 @@ def logout():
     os.remove(path)
     print("logged out (.pypirc file removed)")
 
-def define_upload(package, description, license, **more_info):
+def define_upload(package, description, license, changes, **more_info):
     """
     Define and prep a package for upload by creating the necessary files
     (in the parent folder containing the package's meta-data).
@@ -145,7 +145,7 @@ def define_upload(package, description, license, **more_info):
     - package: the path location of the package you wish to upload (i.e. the folder containing the actual code, not the meta-folder) or the module file (with the .py extension)
     - description: a short sentence describing the package
     - license: the name of the license for your package ('MIT' will automatically create an MIT license.txt file in your package)
-    
+    - changes: list of change descriptions in the current upload version, used to create a changes.txt file and automatically include as a changelog in the README. 
     - **more_info: optional keyword arguments for defining the upload (see distutils.core.setup for valid arguments)
     
     """
@@ -214,6 +214,7 @@ def define_upload(package, description, license, **more_info):
                             a __version__ variable.""")
     
     # make prep files
+    _make_changelog(package, version, changes)
     _make_readme(package)
     _make_gitpack()
     _make_setup(package, **more_info)
@@ -297,17 +298,6 @@ def upload(package, autodoc=True):
     options = ["upload", "-r", "pypi"]
     _commandline_call("sdist", setup_path, *options)
     
-##    # set parameters
-##    sys.argv = [setup_path, "register", "-r", "pypi"]
-##    # then run setup.py to register package online
-##    print("registering package online")
-##    _execute_setup(setup_path)
-##    # then upload the package
-##    print("uploading package")
-##    sys.argv = [setup_path, "sdist", "upload", "-r", "pypi"]
-##    _execute_setup(setup_path)
-##    print("package successfully uploaded")
-    
     # finally try generating and uploading documentation
     if autodoc:
         generate_docs(package)
@@ -331,8 +321,13 @@ def _make_readme(package):
     modinfo = imp.find_module(name,[folder])
     mod = imp.load_module(name, *modinfo)
     mdstring = mod.__doc__
-    # use ipandoc to convert assumed markdown string to rst for display on pypi
     if mdstring:
+        # add changes text to mdstring (so it will be included in readme)
+        changespath = os.path.join(folder, "CHANGES.txt")
+        with open(changespath) as changesfile:
+            for line in changesfile.readlines():
+                mdstring += line
+        # use ipandoc to convert assumed markdown string to rst for display on pypi
         rststring = ipandoc.convert(mdstring, "markdown", "rst")
         readmepath = os.path.join(folder, "README.rst")
         with open(readmepath, "w") as readme:
@@ -416,36 +411,6 @@ def _make_docs(package, **kwargs):
             out = mod.html(**html_kwargs)
             writer.write(out)
 
-##    # commandline approach
-##    # find the main python executable
-##    python_folder = os.path.split(sys.executable)[0]
-##    python_exe = os.path.join(python_folder, "python") # use the executable named "python" instead of "pythonw"
-##    args = [python_exe]
-##    
-##    # python pdoc_build.py --html packname --html-dir "path" --overwrite --external-links --html-no-source'
-##    folder,name = os.path.split(package)
-##    name,ext = os.path.splitext(name)
-##    pdoc_path = os.path.join(os.path.split(__file__)[0], "pdoc_build.py") # comes packaged in the pypi folder
-##    args.append(pdoc_path)
-##    args.extend(["--html",'"%s"'%package]) # prefer full module/package path
-##    os.chdir(folder) # changes working directory to setup.py folder
-##    docfolder = os.path.join(folder, "build", "doc")
-##    if not os.path.lexists(docfolder):
-##        os.makedirs(docfolder)
-##    args.extend(["--html-dir", docfolder])
-##
-##    # options
-##    args.append("--overwrite")
-##    args.append("--external-links")
-##    args.append("--html-no-source")
-##    #args.extend(options)
-##    
-##    # pause after
-##    args.append("& pause")
-##    
-##    # send to commandline
-##    os.system(" ".join(args) )
-
 def _upload_docs(package, **kwargs):
     # instead of typing "python setup.py upload_docs" in commandline
     # by default uploads "build/doc" folder
@@ -459,20 +424,6 @@ def _upload_docs(package, **kwargs):
     options = ["--upload-dir=%s" % upload_dir]
     _commandline_call("upload_docs", setup_path, *options)
 
-# doesnt work after all, since upload command does not allow username and password as args
-##def _try_upload(setup_path, username, password):
-##    if username and password:
-##        sys.argv.extend([])
-##        _execute_setup()
-##    else:
-##        # hope that pypirc file is set and works
-##        _execute_setup()
-##        # if not, ask for interactive login info and try again
-##        username = input("Username")
-##        password = input("Password")
-##        _execute_setup()
-##        pass
-
 def _execute_setup(setup_path):
     setupfile = open(setup_path)
     if sys.version.startswith("3"):
@@ -484,6 +435,78 @@ def _make_gitpack():
     # maybe in the future but not really necessary, for prepping and
     # allowing packages to be hosted directly from github
     pass
+
+def _make_changelog(package, version, changes):
+    folder,name = os.path.split(package)
+    changespath = os.path.join(folder, "CHANGES.txt")
+
+    # if changes file already exists
+    if os.path.exists(changespath):
+
+        # read in existing changes file
+        rawlines = open(changespath).readlines()
+        rawlines = (line for line in rawlines)
+
+        # how to detect version start
+        def detectversion(_line):
+            # ignore strings "version" and "v"
+            _line = _line.lower().replace("version","").replace("v","")
+            # ignore anything after parentheses (such as version date)
+            _line = _line.split("(")[0]
+            # is version line if all chars on line are nrs or symbols (eg dots, spaces, or hashtags), so can build on existing changes files, though it will reformat it.
+            if all(char.isdigit() or not char.isalpha() for char in _line):
+                # clean version string by stripping away anything that is not number or dot
+                _line = "".join([char for char in _line if char.isdigit() or char == "."])
+                return _line
+            else:
+                return False
+
+        # parse into version-changes dict
+        versiondict = dict()
+        line = next(rawlines, None)
+        while line:
+            # detect version start
+            _version = detectversion(line)
+            if _version: 
+                # collect change lines until next version start
+                _changes = []
+                line = next(rawlines, None)
+                while line != None and not detectversion(line):
+                    line = line.strip()
+                    if line:
+                        # clean change string by stripping away from the left any non letter characters
+                        firstcharindex = next( (line.index(char) for char in line if char.isalpha()) )
+                        line = line[firstcharindex:]
+                        _changes.append(line)
+                    line = next(rawlines, None)
+                # add to versiondict
+                versiondict[_version] = _changes
+            else:
+                line = next(rawlines, None)
+
+        # add current version to versiondict, overwriting/updating if already exists
+        versiondict[version] = changes
+        
+        # write to new updated changes file
+        writer = open(changespath, "w")
+        writer.write("\n"+"## CHANGES"+"\n")
+        for version in sorted(versiondict.keys(),
+                              key=lambda x: map(int, x.split(".")), # sort on each version nr as int not str
+                              reverse=True):
+            changes = versiondict[version]
+            writer.write("\n"+"### "+version+"\n\n")
+            for change in changes:
+                writer.write("- "+change+"\n")
+        writer.close()
+
+    else:
+        # no changes file exists, write current changes to a new document
+        writer = open(changespath, "w")
+        writer.write("# CHANGES"+"\n")
+        writer.write("\n"+version+"\n\n")
+        for change in changes:
+            writer.write(change+"\n")
+        writer.close()
 
 def _make_setup(package, **kwargs):
     folder,name = os.path.split(package)
@@ -516,18 +539,6 @@ def _make_setup(package, **kwargs):
             setupstring += "\t" + '%s="""%s""",'%(param,value) + "\n"
             
     setupstring += "\t" + ")" + "\n"
-        
-##    setupstring += "\t" + 'name="%s",'%name + "\n"
-##    setupstring += "\t" + 'packages=["%s"],'%name + "\n"
-##    setupstring += "\t" + 'version="%s",'%version + "\n"
-##    setupstring += "\t" + 'description="%s",'%description + "\n"
-##    setupstring += "\t" + 'author="%s",'%author + "\n"
-##    setupstring += "\t" + 'author_email="%s",'%email + "\n"
-##    setupstring += "\t" + 'url="%s",'%homepage + "\n"
-##    setupstring += "\t" + 'download_url="%s",'%download + "\n"
-##    setupstring += "\t" + 'keywords=%s,'%keywords + "\n"
-##    setupstring += "\t" + "classifiers=[]" + "\n"
-##    setupstring += "\t" + ")" + "\n"
     
     writer = open(os.path.join(folder, "setup.py"), "w")
     writer.write(setupstring)

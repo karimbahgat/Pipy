@@ -233,4 +233,10 @@ you are trying to upload to (the test site and the real site have different acco
 - Add autoincr arg defaulting to True for detecting and incrementing the __version__ var in your top script. 
 
 """
+
+__version__ = "0.1.0"
+
 from .main import *
+
+
+
