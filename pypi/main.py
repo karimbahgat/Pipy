@@ -451,24 +451,30 @@ def _make_changelog(package, version, changes):
         def detectversion(_line):
             # ignore strings "version" and "v"
             _line = _line.lower().replace("version","").replace("v","")
-            # ignore anything after parentheses (such as version date)
-            _line = _line.split("(")[0]
-            # is version line if all chars on line are nrs or symbols (eg dots, spaces, or hashtags), so can build on existing changes files, though it will reformat it.
-            if all(char.isdigit() or not char.isalpha() for char in _line):
-                # clean version string by stripping away anything that is not number or dot
-                _line = "".join([char for char in _line if char.isdigit() or char == "."])
-                return _line
-            else:
-                return False
+            _line = _line.strip()
+            if _line:
+                # ignore anything after parentheses (such as version date)
+                _split = _line.split("(")
+                if len(_split) >= 2:
+                    _line,_date = _split[:2]
+                    _date = _date.rstrip(")")
+                else:
+                    _line,_date = _split[0],None
+                # is version line if all chars on line are nrs or symbols (eg dots, spaces, or hashtags), so can build on existing changes files, though it will reformat it.
+                if all(char.isdigit() or not char.isalpha() for char in _line):
+                    # clean version string by stripping away anything that is not number or dot
+                    _line = "".join([char for char in _line if char.isdigit() or char == "."])
+                    return _line,_date
 
         # parse into version-changes dict
         versiondict = dict()
         line = next(rawlines, None)
         while line:
             # detect version start
-            _version = detectversion(line)
-            if _version: 
+            _versionresult = detectversion(line)
+            if _versionresult: 
                 # collect change lines until next version start
+                _version,_date = _versionresult
                 _changes = []
                 line = next(rawlines, None)
                 while line != None and not detectversion(line):
@@ -480,12 +486,12 @@ def _make_changelog(package, version, changes):
                         _changes.append(line)
                     line = next(rawlines, None)
                 # add to versiondict
-                versiondict[_version] = _changes
+                versiondict[_version] = dict(date=_date, changes=_changes)
             else:
                 line = next(rawlines, None)
 
         # add current version to versiondict, overwriting/updating if already exists
-        versiondict[version] = changes
+        versiondict[version] = dict(date=datetime.date.today(), changes=changes)
         
         # write to new updated changes file
         writer = open(changespath, "w")
@@ -493,8 +499,11 @@ def _make_changelog(package, version, changes):
         for version in sorted(versiondict.keys(),
                               key=lambda x: map(int, x.split(".")), # sort on each version nr as int not str
                               reverse=True):
-            changes = versiondict[version]
-            writer.write("\n"+"### "+version+"\n\n")
+            versionstring = version
+            date = versiondict[version]["date"]
+            if date: versionstring += " (%s)"%date
+            changes = versiondict[version]["changes"]
+            writer.write("\n"+"### "+versionstring+"\n\n")
             for change in changes:
                 writer.write("- "+change+"\n")
         writer.close()
@@ -502,10 +511,13 @@ def _make_changelog(package, version, changes):
     else:
         # no changes file exists, write current changes to a new document
         writer = open(changespath, "w")
-        writer.write("# CHANGES"+"\n")
-        writer.write("\n"+version+"\n\n")
+        writer.write("\n"+"## CHANGES"+"\n")
+        versionstring = version
+        date = datetime.date.today()
+        if date: versionstring += " (%s)"%date
+        writer.write("\n"+"### "+versionstring+"\n\n")
         for change in changes:
-            writer.write(change+"\n")
+            writer.write("- "+change+"\n")
         writer.close()
 
 def _make_setup(package, **kwargs):
