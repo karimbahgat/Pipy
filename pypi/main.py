@@ -495,7 +495,7 @@ def _make_changelog(package, version, changes):
         
         # write to new updated changes file
         writer = open(changespath, "w")
-        writer.write("\n"+"## CHANGES"+"\n")
+        writer.write("\n"+"## Changes"+"\n")
         for version in sorted(versiondict.keys(),
                               key=lambda x: map(int, x.split(".")), # sort on each version nr as int not str
                               reverse=True):
@@ -511,7 +511,7 @@ def _make_changelog(package, version, changes):
     else:
         # no changes file exists, write current changes to a new document
         writer = open(changespath, "w")
-        writer.write("\n"+"## CHANGES"+"\n")
+        writer.write("\n"+"## Changes"+"\n")
         versionstring = version
         date = datetime.date.today()
         if date: versionstring += " (%s)"%date
@@ -546,8 +546,20 @@ def _make_setup(package, **kwargs):
                      "py_modules", "requires", "data_files",
                      "package_data"]:
             valuelist = value
+            # paths should be crossplatform
+            if param in ["packages", "py_modules"]:
+                valuelist = [path.replace("\\","/") for path in valuelist]
+            elif param in ["package_data", "data_files"]:
+                valuelist = dict([ (
+                                    folder.replace("\\","/"),
+                                    [path.replace("\\","/") for path in pathlist]
+                                    )
+                                   for folder,pathlist in valuelist.items()
+                                   ])
+            # write valuelist as list
             setupstring += "\t" + '%s=%s,'%(param,valuelist) + "\n"
         else:
+            # write single values enclosed in quote marks
             setupstring += "\t" + '%s="""%s""",'%(param,value) + "\n"
             
     setupstring += "\t" + ")" + "\n"
