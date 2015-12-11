@@ -1,13 +1,13 @@
-import pypi
- 
-packpath = "pypi"
-pypi.define_upload(packpath,
+import pipy
+
+packpath = "pipy"
+pipy.define_upload(packpath,
                    author="Karim Bahgat",
                    author_email="karim.bahgat.norway@gmail.com",
                    license="MIT",
-                   name="PyPi",
+                   name="Pipy",
                    description="Blabla",
-                   url="http://github.com/karimbahgat/PyPi",
+                   url="http://github.com/karimbahgat/Pipy",
                    keywords="bla bla",
                    classifiers=["License :: OSI Approved",
                                 "Programming Language :: Python",
@@ -15,11 +15,11 @@ pypi.define_upload(packpath,
                                 "Intended Audience :: Developers",
                                 "Intended Audience :: Science/Research",
                                 'Intended Audience :: End Users/Desktop'],
-                   changes=["leeeeeeeee",
-                            "snooooooasnd"],
+                   changes=["testing",
+                            "testing2"],
                    )
 
-#pypi.generate_docs(packpath)
-#pypi.upload_test(packpath)
-#pypi.upload(packpath)
+#pipy.generate_docs(packpath)
+#pipy.upload_test(packpath)
+#pipy.upload(packpath)
 

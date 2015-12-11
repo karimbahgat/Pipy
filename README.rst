@@ -1,28 +1,31 @@
-PyPi
+PiPy
 ====
 
-Install or upload your Python packages from/to the PyPi package index
+Install or upload your Python packages from/to the PyPI package index
 website. Easy to use, IDLE/shell access, and no dependencies.
 
-PyPi is a one-stop tool for all your package needs. It is meant to be
-dead-set simple, easy for beginners, and you never have to leave your
+PiPy (the PyPI acronym in reverse) is a one-stop tool for all your
+package needs, including both downloading and uploading. It is meant to
+be dead-set simple, easy for beginners, and you never have to leave your
 code editor. Its main features can be summarized as:
 
--  install with pypi.install(package).
--  for each package you wish to share:
+-  install new packages with ``pypi.install(package)``.
+-  to upload your own package to PyPI:
 
-   -  write an introduction text inside your toplevel module in
-      Markdown.
-   -  write docstrings for all your classes, functions, and methods in
-      Markdown.
-   -  create an upload.py script, and run it!
+   -  for best online rendering write your code docstrings in Markdown
+      format.
+   -  write a README introduction text as a Markdown docstring at the
+      top of your module.py file or your package's **init**.py file.
+   -  create an upload.py script describing your package (similar to the
+      traditional setup.py file), run it, and let PiPy take care of the
+      rest!
 
 Motivation (LONG VERSION)
 -------------------------
 
 Python has received some criticism for its lack of a builtin easy to use
 package management system, for both installing new packages,
-uploading/sharing your own work, an d.
+uploading/sharing your own work, and producing documentation files.
 
 Installing
 ~~~~~~~~~~
@@ -51,11 +54,27 @@ Readme
 
 Writing READMEs in markdown is really easy and has become quite popular
 due to GitHub supporting it. However PyPi still only accepts reST,
-despite calls for change and some progress being made. #### Code
-docstrings Many types of markup languages and in-code standards... ####
-API Sphinx huge and lots of config, not builtin. Pydoc builtin but very
-outdated. #### Docs hosting Even after creating documentation it is not
-straightforward how to get it online along with your package.
+despite calls for change and some progress being made.
+
+Code docstrings
+^^^^^^^^^^^^^^^
+
+Many types of markup languages and in-code standards...
+
+API
+^^^
+
+Sphinx is often the recommended tool but is a huge package which
+sometimes has problems being installed. Getting an overview of the
+available configurations and procedures can be a bit overwhelming. Pydoc
+is another library that comes included with Python but unfortunately
+produces very outdated html files.
+
+Docs hosting
+^^^^^^^^^^^^
+
+Even after creating documentation it is not straightforward how to get
+it online along with your package.
 
 The commandline
 ~~~~~~~~~~~~~~~
@@ -67,22 +86,22 @@ fact that all solutions are limited to the commandline only, with the
 implied extra setup and learning curve that comes with that such as
 adding paths to environment variables, or managing multiple versions of
 Python. My feeling is that use of the commandline is a highly personal
-and individual preference, usually only by hard scientists, people in
-technical positions or who frequently use Python in the workplace, or
-who have years of experience or a passion for computers. It is sometimes
-just taken for granted that beginners should know how to or feel
-comfertable using the commandline. For advanced users and beginners
-alike, the fact that one has to switch away from the main code editor
-for some tasks but not others adds conceptual overhead and potential
-confusion, and brings in a lot of OS specific contingencies and
-challenges.
+and individual preference, mostly used by trained computer scientists,
+people in other technical/scientific positions, who frequently use
+Python in the workplace, or who have years of experience or a passion
+for computers. It is sometimes just taken for granted that beginners
+should know how to or feel comfertable using the commandline. For
+advanced users and beginners alike, the fact that one has to switch away
+from the main code editor for some tasks but not others adds conceptual
+overhead and potential confusion, and brings in a lot of OS specific
+contingencies and challenges.
 
 The Bottom Line
 ---------------
 
-I'm sorry but this just isn't okay. Tired of feeling frustrated by it, I
-decided to do something. And so the PyPi package was born. It started
-out small, but has now grown to incorporate all major aspects of package
+Given Python's reputation for being easy to use, this isn't how things
+should be. And so I began writing the PiPy package. It started out
+small, but has now grown to incorporate all major aspects of package
 management in one lightweight and easy to use package: installing,
 documenting, and uploading. Primarily for my own use, this is the only
 way I handle packages and it was the turning stone that made it fun to
@@ -115,15 +134,24 @@ Disclaimer
 
 This package has no relation to the makers of PyPi or pip, and may or
 may not behave differently to how pip normally works when called from a
-commandline window. Installing very large packages can take a long time.
-As with pip, installing binary C, C#, or C++ packages will only work if
-you have a compiler, and know all sorts of tech-wizardry.
+commandline window. As with pip, installing binary C, C#, or C++
+packages will only work if you have a compiler, and know all sorts of
+tech-wizardry.
 
 Installation
 ------------
 
 Make pypi available by putting the folder anywhere it can be imported
 (eg site-packages).
+
+The following Python snippet will do it for you using only builtin
+modules:
+
+::
+
+    !! DOESNT WORK YET !!
+
+    import os,urllib,StringIO,zipfile; savepath=os.path.dirname(os.__file__)+'/site-packages'; raw = urllib.urlopen("https://github.com/karimbahgat/PyPi/archive/master.zip"); file = zipfile.ZipFile(StringIO.StringIO(raw.read())); [os.mkdir("C:/Users/kimo/Desktop/test/"+"/".join(name.split("/")[1:])) for name in file.namelist() if name.startswith("PyPi-master/pypi") and name.endswith("/")]; [open("C:/Users/kimo/Desktop/test/"+"/".join(name.split("/")[1:]), "wb").write(file.open(name).read()) for name in file.namelist() if name.startswith("PyPi-master/pypi")]
 
 Note: Comes pre-packaged with pip and will automatically install the
 necessary setuptools package the first time you import pypi if you don't
@@ -249,11 +277,13 @@ the keywords, and the classifier tags:
 
 The script above defines how the setup.py script will look, which is
 made simpler, does some autofilling for you, and produces the setup
-script for you. It also generates the documentation, and finally uploads
-your package. Sharing a package or releasing a new version is then as
-simple as running this upload.py script, with all documentation updated
-and the version automatically taken from your package's **version**
-attribute.
+script for you. The ``changes`` argument is a list of changes added in
+the current version, which will add a new or update any existing
+CHANGES.txt file. It also generates the documentation, and finally
+uploads your package. Sharing a package or releasing a new version is
+then as simple as running this upload.py script, with all documentation
+updated and the version automatically taken from your package's
+**version** attribute.
 
 Note that you should try uploading to the test website first, before
 uploading to the real site.
@@ -263,36 +293,11 @@ details even though you have logged in, make sure that you have indeed
 registered on the site that you are trying to upload to (the test site
 and the real site have different accounts).
 
-To do
------
-
--  Ask mailing list about pypi package name conflict/ethics.
--  Automate uploading as wheel, http://pythonwheels.com/
--  Prevent running all upload steps after one of the steps fail, maybe
-   by switching to subprocess and listen for result.
--  Add support for changelog:
-
-   a. Either auto detect a changelog file, and append to README.rst.
-   b. And/or add a ``changes`` str or list of str arg to pypi.upload().
-      The new version nr will be written as a new heading to a changelog
-      file, along with bulletpoints of the given text of changes for
-      that version upload.
-   c. Or maybe...read changes from git somehow, but would be limited to
-      people using GitHub. See eg
-      https://github.com/michaeljoseph/changes
-
--  Make all hidden methods into public, so that user can more easily
-   customize.
--  Possibly also upload each new pypi release as a new version to
-   GitHub, would be really nice?
--  Add autoincr arg defaulting to True for detecting and incrementing
-   the **version** var in your top script.
-
-CHANGES
+Changes
 -------
 
-0.1.0 (2015-06-25)
+0.1.0 (2015-12-11)
 ~~~~~~~~~~~~~~~~~~
 
--  leeeeeeeee
--  snooooooasnd
+-  testing
+-  testing2
