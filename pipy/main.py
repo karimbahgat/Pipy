@@ -64,6 +64,33 @@ def _commandline_call(action, package, *options):
     # send to commandline
     os.system(" ".join(args) ) 
 
+def add_github(githubfolder):
+    """
+    Create a script that auto appends to the path all repos in your github folder on startup.
+    Only needs to be called once. 
+    """
+    import site
+    sitepackdir = site.getsitepackages()[-1]
+    
+    # make a .py script for adding all github paths
+    path = os.path.join(sitepackdir, "pipy_addgithubpaths.py")
+    with open(path, "w") as writer:
+        writer.write( """
+import sys
+import os
+
+folder = "%s"
+for dirname in os.listdir(folder):
+    path = os.path.join(folder, dirname)
+    sys.path.append(path)
+""" % githubfolder
+                      )
+        
+    # add the .pth file that runs the .py script on every startup
+    path = os.path.join(sitepackdir, "pipy_addgithubpaths.pth")
+    with open(path, "w") as writer:
+        writer.write("import pipy_addgithubpaths")
+
 def install(package, *options, **kwargs):
     """
     Install a package from within the IDLE, same way as using the commandline
@@ -71,9 +98,9 @@ def install(package, *options, **kwargs):
     specify the install options that typically come after, such as "-U"
     for update. See pip-documentation for valid option strings.
 
-    - gohlke: Downloads a precompiled version of the package from
+    - gohlke: When True, downloads a precompiled version of the package from
             Cristoph Gohlke's website "Unofficial Windows Binaries
-            for Python Extension Packages".
+            for Python Extension Packages". Warning: Not fully tested.
     """
     if kwargs.get("gohlke",False):
 
