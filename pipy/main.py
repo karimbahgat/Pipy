@@ -665,6 +665,7 @@ def _make_changelog(package, version, changes):
 
 def _make_setup(package, **kwargs):
     folder,name = os.path.split(package)
+
     setupstring = ""
     setupstring += "try: from setuptools import setup" + "\n"
     setupstring += "except: from distutils.core import setup" + "\n"
@@ -694,10 +695,10 @@ def _make_setup(package, **kwargs):
                 valuelist = [path.replace("\\","/") for path in valuelist]
             elif param in ["package_data", "data_files"]:
                 valuelist = dict([ (
-                                    folder.replace("\\","/"),
+                                    subdir.replace("\\","/"),
                                     [path.replace("\\","/") for path in pathlist]
                                     )
-                                   for folder,pathlist in valuelist.items()
+                                   for subdir,pathlist in valuelist.items()
                                    ])
             # write valuelist as list
             setupstring += "\t" + '%s=%s,'%(param,valuelist) + "\n"
