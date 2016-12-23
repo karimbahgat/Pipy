@@ -7,10 +7,13 @@ import os.path
 import sys
 
 from pip._vendor import lockfile
-from pip._vendor import pkg_resources
+from pip._vendor.packaging import version as packaging_version
 
-from pip.compat import total_seconds
+from pip.compat import total_seconds, WINDOWS
+from pip.models import PyPI
 from pip.locations import USER_CACHE_DIR, running_under_virtualenv
+from pip.utils import ensure_dir, get_installed_version
+from pip.utils.filesystem import check_path_owner
 
 
 SELFCHECK_DATE_FMT = "%Y-%m-%dT%H:%M:%SZ"
@@ -56,10 +59,21 @@ class GlobalSelfCheckState(object):
             self.state = {}
 
     def save(self, pypi_version, current_time):
+        # Check to make sure that we own the directory
+        if not check_path_owner(os.path.dirname(self.statefile_path)):
+            return
+
+        # Now that we've ensured the directory is owned by this user, we'll go
+        # ahead and make sure that all our directories are created.
+        ensure_dir(os.path.dirname(self.statefile_path))
+
         # Attempt to write out our version check file
         with lockfile.LockFile(self.statefile_path):
-            with open(self.statefile_path) as statefile:
-                state = json.load(statefile)
+            if os.path.exists(self.statefile_path):
+                with open(self.statefile_path) as statefile:
+                    state = json.load(statefile)
+            else:
+                state = {}
 
             state[sys.prefix] = {
                 "last_check": current_time.strftime(SELFCHECK_DATE_FMT),
@@ -85,7 +99,11 @@ def pip_version_check(session):
     the active virtualenv or in the user's USER_CACHE_DIR keyed off the prefix
     of the pip script path.
     """
-    import pip  # imported here to prevent circular imports
+    installed_version = get_installed_version("pip")
+    if installed_version is None:
+        return
+
+    pip_version = packaging_version.parse(installed_version)
     pypi_version = None
 
     try:
@@ -104,24 +122,37 @@ def pip_version_check(session):
         # Refresh the version if we need to or just see if we need to warn
         if pypi_version is None:
             resp = session.get(
-                "https://pypi.python.org/pypi/pip/json",
+                PyPI.pip_json_url,
                 headers={"Accept": "application/json"},
             )
             resp.raise_for_status()
-            pypi_version = resp.json()["info"]["version"]
+            pypi_version = [
+                v for v in sorted(
+                    list(resp.json()["releases"]),
+                    key=packaging_version.parse,
+                )
+                if not packaging_version.parse(v).is_prerelease
+            ][-1]
 
             # save that we've performed a check
             state.save(pypi_version, current_time)
 
-        pip_version = pkg_resources.parse_version(pip.__version__)
+        remote_version = packaging_version.parse(pypi_version)
 
         # Determine if our pypi_version is older
-        if pip_version < pkg_resources.parse_version(pypi_version):
+        if (pip_version < remote_version and
+                pip_version.base_version != remote_version.base_version):
+            # Advise "python -m pip" on Windows to avoid issues
+            # with overwriting pip.exe.
+            if WINDOWS:
+                pip_cmd = "python -m pip"
+            else:
+                pip_cmd = "pip"
             logger.warning(
                 "You are using pip version %s, however version %s is "
                 "available.\nYou should consider upgrading via the "
-                "'pip install --upgrade pip' command." % (pip.__version__,
-                                                          pypi_version)
+                "'%s install --upgrade pip' command.",
+                pip_version, pypi_version, pip_cmd
             )
 
     except Exception:

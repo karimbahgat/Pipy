@@ -1,15 +1,12 @@
 from __future__ import absolute_import
 
-import imp
 import logging
 import os
-import sys
 import tempfile
 
-from pip.compat import uses_pycache, WINDOWS
+from pip.compat import uses_pycache, WINDOWS, cache_from_source
 from pip.exceptions import UninstallationError
-from pip.utils import (rmtree, ask, is_local, dist_is_local, renames,
-                       normalize_path)
+from pip.utils import rmtree, ask, is_local, renames, normalize_path
 from pip.utils.logging import indent_log
 
 
@@ -35,19 +32,13 @@ class UninstallPathSet(object):
         """
         return is_local(path)
 
-    def _can_uninstall(self):
-        if not dist_is_local(self.dist):
-            logger.info(
-                "Not uninstalling %s at %s, outside environment %s",
-                self.dist.project_name,
-                normalize_path(self.dist.location),
-                sys.prefix,
-            )
-            return False
-        return True
-
     def add(self, path):
-        path = normalize_path(path)
+        head, tail = os.path.split(path)
+
+        # we normalize the head to resolve parent directory symlinks, but not
+        # the tail, since we only want to uninstall symlinks, not their targets
+        path = os.path.join(normalize_path(head), os.path.normcase(tail))
+
         if not os.path.exists(path):
             return
         if self._permitted(path):
@@ -58,7 +49,7 @@ class UninstallPathSet(object):
         # __pycache__ files can show up after 'installed-files.txt' is created,
         # due to imports
         if os.path.splitext(path)[1] == '.py' and uses_pycache:
-            self.add(imp.cache_from_source(path))
+            self.add(cache_from_source(path))
 
     def add_pth(self, pth_file, entry):
         pth_file = normalize_path(pth_file)
@@ -90,15 +81,16 @@ class UninstallPathSet(object):
     def remove(self, auto_confirm=False):
         """Remove paths in ``self.paths`` with confirmation (unless
         ``auto_confirm`` is True)."""
-        if not self._can_uninstall():
-            return
         if not self.paths:
             logger.info(
                 "Can't uninstall '%s'. No files were found to uninstall.",
                 self.dist.project_name,
             )
             return
-        logger.info('Uninstalling %s:', self.dist.project_name)
+        logger.info(
+            'Uninstalling %s-%s:',
+            self.dist.project_name, self.dist.version
+        )
 
         with indent_log():
             paths = sorted(self.compact(self.paths))
@@ -124,7 +116,8 @@ class UninstallPathSet(object):
                 for pth in self.pth.values():
                     pth.remove()
                 logger.info(
-                    'Successfully uninstalled %s', self.dist.project_name
+                    'Successfully uninstalled %s-%s',
+                    self.dist.project_name, self.dist.version
                 )
 
     def rollback(self):
@@ -173,11 +166,10 @@ class UninstallPthEntries(object):
 
     def remove(self):
         logger.debug('Removing pth entries from %s:', self.file)
-        fh = open(self.file, 'rb')
-        # windows uses '\r\n' with py3k, but uses '\n' with py2.x
-        lines = fh.readlines()
-        self._saved_lines = lines
-        fh.close()
+        with open(self.file, 'rb') as fh:
+            # windows uses '\r\n' with py3k, but uses '\n' with py2.x
+            lines = fh.readlines()
+            self._saved_lines = lines
         if any(b'\r\n' in line for line in lines):
             endline = '\r\n'
         else:
@@ -188,9 +180,8 @@ class UninstallPthEntries(object):
                 lines.remove((entry + endline).encode("utf-8"))
             except ValueError:
                 pass
-        fh = open(self.file, 'wb')
-        fh.writelines(lines)
-        fh.close()
+        with open(self.file, 'wb') as fh:
+            fh.writelines(lines)
 
     def rollback(self):
         if self._saved_lines is None:
@@ -199,7 +190,6 @@ class UninstallPthEntries(object):
             )
             return False
         logger.debug('Rolling %s back to previous state', self.file)
-        fh = open(self.file, 'wb')
-        fh.writelines(self._saved_lines)
-        fh.close()
+        with open(self.file, 'wb') as fh:
+            fh.writelines(self._saved_lines)
         return True
