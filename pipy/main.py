@@ -215,6 +215,14 @@ def install(package, *options, **kwargs):
         
     _commandline_call("install", package, *options)
 
+def upgrade(package, *options):
+    """
+    Shortcut for upgrading a package to a newer version,
+    without having to specify the "--upgrade" option.
+    """
+    options.insert(0, "--upgrade")
+    install(package, *options)
+
 def build(package, *options):
     """
     Test if a local C/C++ package will build (aka compile)
