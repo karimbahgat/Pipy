@@ -220,6 +220,7 @@ def upgrade(package, *options):
     Shortcut for upgrading a package to a newer version,
     without having to specify the "--upgrade" option.
     """
+    options = list(options)
     options.insert(0, "--upgrade")
     install(package, *options)
 
@@ -260,12 +261,12 @@ def login(username, password):
     pypircstring += "\t" + "testpypi" + "\n"
     pypircstring += "\n"
     pypircstring += "[pypi]" + "\n"
-    pypircstring += "repository: https://pypi.python.org/pypi" + "\n"
+    pypircstring += "repository: https://upload.pypi.org/legacy/" + "\n"
     pypircstring += "username: " + username + "\n"
     pypircstring += "password: " + password + "\n"
     pypircstring += "\n"
     pypircstring += "[testpypi]" + "\n"
-    pypircstring += "repository: https://testpypi.python.org/pypi" + "\n"
+    pypircstring += "repository: https://test.pypi.org/legacy/" + "\n"
     pypircstring += "username: " + username + "\n"
     pypircstring += "password: " + password + "\n"
     # create the file
