@@ -388,15 +388,16 @@ def generate_docs(package, **kwargs):
     _make_docs(package, **kwargs)
     print("documentation successfully generated")
 
-def upload_docs(package, **kwargs):
-    """
-    Upload documentation html docs located in "build/doc" folder.
-    """
-    # absolute path
-    package = os.path.abspath(package)
-    ###
-    _upload_docs(package, **kwargs)
-    print("documentation successfully uploaded to pythonhosted.org")
+# Upload docs to pythonhosted no longer possible
+##def upload_docs(package, **kwargs):
+##    """
+##    Upload documentation html docs located in "build/doc" folder.
+##    """
+##    # absolute path
+##    package = os.path.abspath(package)
+##    ###
+##    _upload_docs(package, **kwargs)
+##    print("documentation successfully uploaded to pythonhosted.org")
 
 def upload_test(package):
     """
@@ -438,11 +439,12 @@ def upload(package, autodoc=True):
     # first remember to update the readme, in case docstring changed
     _make_readme(package)
     # then try registering
+    # (NO LONGER REQUIRED)
     # instead of typing "python setup.py register -r pypi" in commandline
-    print("registering package")
-    setup_path = os.path.join(folder, "setup.py")
-    options = ["-r", "pypi"]
-    _commandline_call("register", setup_path, *options)
+    #print("registering package")
+    #setup_path = os.path.join(folder, "setup.py")
+    #options = ["-r", "pypi"]
+    #_commandline_call("register", setup_path, *options)
     # then try uploading
     # instead of typing "python setup.py sdist upload -r pypi" in commandline
     print("uploading package")
@@ -453,7 +455,7 @@ def upload(package, autodoc=True):
     # finally try generating and uploading documentation
     if autodoc:
         generate_docs(package)
-        upload_docs(package)
+        #upload_docs(package) # no longer possible
 
 
 
@@ -507,7 +509,7 @@ def _make_docs(package, **kwargs):
     name,ext = os.path.splitext(name)
     docfolder = kwargs.get("html_dir")
     if not docfolder:
-        docfolder = os.path.join(folder, "build", "doc")
+        docfolder = os.path.join(folder, "docs")
     # get toplevel package docstring
     import imp
     modinfo = imp.find_module(name,[folder])
@@ -563,18 +565,19 @@ def _make_docs(package, **kwargs):
             out = mod.html(**html_kwargs)
             writer.write(out)
 
-def _upload_docs(package, **kwargs):
-    # instead of typing "python setup.py upload_docs" in commandline
-    # by default uploads "build/doc" folder
-    
-    # NOTE: REQUIRES SETUP.PY TO USE SETUPTOOLS INSTEAD OF DISTUTILS
-    # ...from setuptools import setup
-    folder,name = os.path.split(package)
-    os.chdir(folder)
-    setup_path = os.path.join(folder, "setup.py")
-    upload_dir = kwargs.get("upload_dir", "build/doc")
-    options = ["--upload-dir=%s" % upload_dir]
-    _commandline_call("upload_docs", setup_path, *options)
+# Upload docs to pythonhosted no longer possible
+##def _upload_docs(package, **kwargs):
+##    # instead of typing "python setup.py upload_docs" in commandline
+##    # by default uploads "build/doc" folder
+##    
+##    # NOTE: REQUIRES SETUP.PY TO USE SETUPTOOLS INSTEAD OF DISTUTILS
+##    # ...from setuptools import setup
+##    folder,name = os.path.split(package)
+##    os.chdir(folder)
+##    setup_path = os.path.join(folder, "setup.py")
+##    upload_dir = kwargs.get("upload_dir", "build/doc")
+##    options = ["--upload-dir=%s" % upload_dir]
+##    _commandline_call("upload_docs", setup_path, *options)
 
 def _execute_setup(setup_path):
     setupfile = open(setup_path)
