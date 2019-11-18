@@ -367,7 +367,7 @@ def define_upload(package, description, license, changes, **more_info):
     
     # make prep files
     _make_changelog(package, version, changes)
-    _make_readme(package)
+    #_make_readme(package)
     _make_gitpack()
     _make_setup(package, **more_info)
     _make_cfg(package)
@@ -411,13 +411,14 @@ def upload_test(package):
     ###
     folder,name = os.path.split(package)
     # first remember to update the readme, in case docstring changed
-    _make_readme(package)
+    #_make_readme(package)
     # then try registering
+    # (NO LONGER REQUIRED)
     # instead of typing "python setup.py register -r testpypi" in commandline
-    print("registering package (test)")
-    setup_path = os.path.join(folder, "setup.py")
-    options = ["-r", "testpypi"]
-    _commandline_call("register", setup_path, *options)
+    #print("registering package (test)")
+    #setup_path = os.path.join(folder, "setup.py")
+    #options = ["-r", "testpypi"]
+    #_commandline_call("register", setup_path, *options)
     # then try uploading
     # instead of typing "python setup.py sdist upload -r testpypi" in commandline
     print("uploading package (test)")
@@ -437,7 +438,7 @@ def upload(package, autodoc=True):
     ###
     folder,name = os.path.split(package)
     # first remember to update the readme, in case docstring changed
-    _make_readme(package)
+    #_make_readme(package)
     # then try registering
     # (NO LONGER REQUIRED)
     # instead of typing "python setup.py register -r pypi" in commandline
@@ -454,7 +455,7 @@ def upload(package, autodoc=True):
     
     # finally try generating and uploading documentation
     if autodoc:
-        generate_docs(package)
+        pass #generate_docs(package)
         #upload_docs(package) # no longer possible
 
 
@@ -694,6 +695,13 @@ def _make_setup(package, **kwargs):
         for filename in os.listdir(folder):
             if filename.startswith("README"):
                 setupstring += "\t" + 'long_description=open("%s").read(), '%filename + "\n"
+                if filename.endswith('.md'):
+                    desctype = "text/markdown"
+                elif filename.endswith('.rst'):
+                    desctype = "text/x-rst"
+                else:
+                    desctype = "text/plain"
+                setupstring += "\t" + 'long_description_content_type="%s",'%desctype + "\n"
                 break
 
     # general options
